@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Hypothesis Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo-container">
+                <i class="fas fa-brain logo-icon"></i>
+                <h1>Scientific Hypothesis Generator</h1>
+            </div>
+            <div class="theme-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle-checkbox">
+                    <span class="slider round"></span>
+                </label>
+                <span id="theme-label">Light Mode</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="search-section">
+                <div class="card">
+                    <h2><i class="fas fa-search"></i> Search Parameters</h2>
+                    <div class="form-group">
+                        <label for="pubmed-query">PubMed Query:</label>
+                        <input type="text" id="pubmed-query" placeholder="e.g., cancer AND immunotherapy">
+                    </div>
+                    <div class="form-group">
+                        <label for="arxiv-query">ArXiv Query:</label>
+                        <input type="text" id="arxiv-query" placeholder="e.g., quantum computing">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="max-papers">Max Papers:</label>
+                            <input type="number" id="max-papers" min="2" max="50" value="10">
+                        </div>
+                        <div class="form-group half">
+                            <label for="num-hypotheses">Num Hypotheses:</label>
+                            <input type="number" id="num-hypotheses" min="1" max="10" value="5">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="start-btn" class="btn primary">
+                            <i class="fas fa-play"></i> Start Processing
+                        </button>
+                        <button id="reset-btn" class="btn secondary">
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="status-section">
+                <div class="card">
+                    <h2><i class="fas fa-tasks"></i> Processing Status</h2>
+                    <div id="status-message" class="status-message">System ready</div>
+                    <div class="progress-container">
+                        <div id="progress-bar" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="results-container">
+                <section class="papers-section tab-section">
+                    <div class="card full-height">
+                        <div class="card-header">
+                            <h2><i class="fas fa-file-alt"></i> Papers</h2>
+                            <span id="papers-count" class="count-badge">0</span>
+                        </div>
+                        <div class="card-tabs">
+                            <div class="tab active" data-tab="papers-list">List</div>
+                            <div class="tab" data-tab="papers-stats">Stats</div>
+                        </div>
+                        <div class="card-content">
+                            <div id="papers-list" class="tab-content active">
+                                <div class="papers-container" id="papers-container">
+                                    <div class="empty-message">No papers loaded yet</div>
+                                </div>
+                            </div>
+                            <div id="papers-stats" class="tab-content">
+                                <div class="stats-container">
+                                    <div class="stat-card">
+                                        <div class="stat-title">PubMed Papers</div>
+                                        <div class="stat-value" id="pubmed-count">0</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-title">ArXiv Papers</div>
+                                        <div class="stat-value" id="arxiv-count">0</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-title">Total Entities</div>
+                                        <div class="stat-value" id="entities-count">0</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-title">Total Claims</div>
+                                        <div class="stat-value" id="claims-count">0</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="graph-section">
+                    <div class="card full-height">
+                        <div class="card-header">
+                            <h2><i class="fas fa-project-diagram"></i> Knowledge Graph</h2>
+                        </div>
+                        <div class="card-content graph-content">
+                            <div id="graph-container" class="graph-container">
+                                <div class="empty-message">No knowledge graph generated yet</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="hypotheses-section tab-section">
+                    <div class="card full-height">
+                        <div class="card-header">
+                            <h2><i class="fas fa-lightbulb"></i> Hypotheses</h2>
+                            <span id="hypotheses-count" class="count-badge">0</span>
+                        </div>
+                        <div class="card-tabs">
+                            <div class="tab active" data-tab="hypotheses-list">List</div>
+                            <div class="tab" data-tab="hypothesis-details">Details</div>
+                        </div>
+                        <div class="card-content">
+                            <div id="hypotheses-list" class="tab-content active">
+                                <div class="hypotheses-container" id="hypotheses-container">
+                                    <div class="empty-message">No hypotheses generated yet</div>
+                                </div>
+                            </div>
+                            <div id="hypothesis-details" class="tab-content">
+                                <div id="hypothesis-detail-container" class="hypothesis-detail-container">
+                                    <div class="empty-message">Select a hypothesis to view details</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <p>Scientific Hypothesis Generator © 2025</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
