@@ -1,0 +1,6 @@
+pm_system = RenewableEnergyPredictiveMaintenance("your_scada_data.csv")
+pm_system.load_and_preprocess_data()
+pm_system.build_autoencoder()
+pm_system.train_autoencoder()
+pm_system.build_rul_model()
+pm_system.train_rul_model()
