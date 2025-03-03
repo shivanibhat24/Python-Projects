@@ -60,15 +60,24 @@ class QNetwork:
                 next_q_values = self.predict(next_state)
                 target = reward + self.gamma * np.amax(next_q_values)
             
-            # Simple update rule (very simplified for this example)
-            target_f = self.predict(state)
+            # Get activations for backprop
+            layer1 = np.dot(state, self.model['weights1']) + self.model['bias1']
+            layer1_activation = self._relu(layer1)
+            layer2 = np.dot(layer1_activation, self.model['weights2']) + self.model['bias2']
+            layer2_activation = self._relu(layer2)
+            
+            # Calculate current prediction and target
+            q_values = self.predict(state)
+            target_f = np.copy(q_values)
             target_f[action] = target
             
-            # Update weights (extremely simplified)
-            error = target_f - self.predict(state)
-            # In a real implementation, we would do proper backpropagation
-            # This is a very simple approximation
-            self.model['weights3'] += self.learning_rate * error.reshape(-1, 1)
+            # Calculate error
+            error = target_f - q_values
+            
+            # Simple gradient update for final layer weights
+            d_weights3 = np.outer(layer2_activation, error)
+            self.model['weights3'] += self.learning_rate * d_weights3
+            self.model['bias3'] += self.learning_rate * error
             
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
@@ -109,13 +118,15 @@ class Game2048:
         8192: (249, 246, 242),
     }
 
-    def __init__(self, width=800, height=800, rows=4, cols=4):
+    def __init__(self, width=480, height=640, rows=4, cols=4):
         pygame.init()
         self.width = width
         self.height = height
+        self.header_height = 160  # Reduced header height
+        self.game_height = height - self.header_height
         self.rows = rows
         self.cols = cols
-        self.tile_height = height // rows
+        self.tile_height = self.game_height // rows
         self.tile_width = width // cols
 
         # UI Constants
@@ -128,16 +139,16 @@ class Game2048:
         self.tile_border_radius = 10
         self.high_score = 0
         self.current_score = 0
-        self.game_over_font = pygame.font.SysFont("Arial", 72, bold=True)
-        self.score_font = pygame.font.SysFont("Arial", 36, bold=True)
-        self.title_font = pygame.font.SysFont("Arial", 80, bold=True)
+        self.game_over_font = pygame.font.SysFont("Arial", 48, bold=True)
+        self.score_font = pygame.font.SysFont("Arial", 28, bold=True)
+        self.title_font = pygame.font.SysFont("Arial", 60, bold=True)
         
-        # Dynamic font sizing
+        # Dynamic font sizing - adjusted for smaller tiles
         self.font_sizes = {
-            2: 60, 4: 60, 8: 60, 16: 60,
-            32: 56, 64: 56, 128: 48,
-            256: 48, 512: 48, 1024: 36,
-            2048: 36, 4096: 36, 8192: 36
+            2: 40, 4: 40, 8: 40, 16: 40,
+            32: 36, 64: 36, 128: 32,
+            256: 32, 512: 32, 1024: 24,
+            2048: 24, 4096: 24, 8192: 24
         }
         
         self.fonts = {
@@ -147,7 +158,7 @@ class Game2048:
 
         # Game constants
         self.fps = 60
-        self.move_vel = 25  # Increased for smoother animation
+        self.move_vel = 20  # Adjusted for smaller tiles
         
         # ML components
         self.agent = QNetwork()
@@ -157,7 +168,7 @@ class Game2048:
         
         # Init display
         self.window = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("Enhanced 2048")
+        pygame.display.set_caption("2048 Game")
         
         # Game state
         self.tiles = self.generate_tiles()
@@ -170,7 +181,7 @@ class Game2048:
         tiles = {}
         for _ in range(2):
             row, col = self.get_random_pos(tiles)
-            tiles[f"{row}{col}"] = Tile(2, row, col, self.tile_width, self.tile_height)
+            tiles[f"{row}{col}"] = Tile(2, row, col, self.tile_width, self.tile_height, self.header_height)
         return tiles
 
     def get_random_pos(self, tiles):
@@ -204,7 +215,9 @@ class Game2048:
             return False
             
         value = 2 if random.random() < 0.9 else 4
-        self.tiles[f"{row}{col}"] = Tile(value, row, col, self.tile_width, self.tile_height)
+        new_tile = Tile(value, row, col, self.tile_width, self.tile_height, self.header_height)
+        new_tile.pulse_count = 3  # Set pulse animation for new tiles
+        self.tiles[f"{row}{col}"] = new_tile
         return True
 
     def draw_game_over(self):
@@ -228,16 +241,16 @@ class Game2048:
         )
 
     def draw_header(self):
-        # Draw title
+        # Draw title - adjusted positions for smaller window
         title_text = self.title_font.render("2048", True, self.font_color)
-        self.window.blit(title_text, (50, 30))
+        self.window.blit(title_text, (30, 20))
         
-        # Draw score panel
+        # Draw score panel - adjusted sizes and positions
         pygame.draw.rect(self.window, self.panel_color, 
-                        (self.width - 320, 30, 140, 80), 
+                        (self.width - 240, 20, 100, 60), 
                         border_radius=5)
         pygame.draw.rect(self.window, self.panel_color, 
-                        (self.width - 160, 30, 140, 80), 
+                        (self.width - 130, 20, 100, 60), 
                         border_radius=5)
         
         score_label = self.score_font.render("SCORE", True, (249, 246, 242))
@@ -249,32 +262,32 @@ class Game2048:
         # Score panel
         self.window.blit(
             score_label,
-            (self.width - 320 + 70 - score_label.get_width() // 2, 40)
+            (self.width - 240 + 50 - score_label.get_width() // 2, 25)
         )
         self.window.blit(
             score_value,
-            (self.width - 320 + 70 - score_value.get_width() // 2, 70)
+            (self.width - 240 + 50 - score_value.get_width() // 2, 50)
         )
         
         # Best score panel
         self.window.blit(
             high_score_label,
-            (self.width - 160 + 70 - high_score_label.get_width() // 2, 40)
+            (self.width - 130 + 50 - high_score_label.get_width() // 2, 25)
         )
         self.window.blit(
             high_score_value,
-            (self.width - 160 + 70 - high_score_value.get_width() // 2, 70)
+            (self.width - 130 + 50 - high_score_value.get_width() // 2, 50)
         )
         
-        # AI toggle button
+        # AI toggle button - adjusted position and size
         ai_button_color = (142, 122, 101) if self.is_ai_playing else (187, 173, 160)
         pygame.draw.rect(self.window, ai_button_color, 
-                        (50, 120, 200, 50), 
+                        (30, 90, 160, 40), 
                         border_radius=5)
-        ai_text = self.score_font.render("AI Mode: " + ("ON" if self.is_ai_playing else "OFF"), True, (249, 246, 242))
+        ai_text = self.score_font.render("AI: " + ("ON" if self.is_ai_playing else "OFF"), True, (249, 246, 242))
         self.window.blit(
             ai_text,
-            (50 + 100 - ai_text.get_width() // 2, 120 + 25 - ai_text.get_height() // 2)
+            (30 + 80 - ai_text.get_width() // 2, 90 + 20 - ai_text.get_height() // 2)
         )
 
     def draw_grid(self):
@@ -282,7 +295,7 @@ class Game2048:
         pygame.draw.rect(
             self.window, 
             self.panel_color, 
-            (0, 200, self.width, self.height - 200), 
+            (0, self.header_height, self.width, self.game_height), 
             border_radius=10
         )
         
@@ -294,7 +307,7 @@ class Game2048:
                     self.COLORS[0],  # Empty cell color
                     (
                         col * self.tile_width + self.tile_margin,
-                        row * self.tile_height + self.tile_margin + 200,  # Offset for header
+                        row * self.tile_height + self.tile_margin + self.header_height,
                         self.tile_width - 2 * self.tile_margin,
                         self.tile_height - 2 * self.tile_margin
                     ),
@@ -330,183 +343,266 @@ class Game2048:
         board = self.get_state_matrix()
         
         for direction in directions:
-            # Try each direction
+            # Create a copy of the board for testing
             board_copy = np.copy(board)
-            if direction == "left":
-                for row in range(self.rows):
-                    merged = [False] * self.cols
-                    for col in range(1, self.cols):
-                        if board_copy[row][col] == 0:
-                            continue
-                        
-                        curr_col = col
-                        while curr_col > 0 and board_copy[row][curr_col-1] == 0:
-                            board_copy[row][curr_col-1] = board_copy[row][curr_col]
-                            board_copy[row][curr_col] = 0
-                            curr_col -= 1
-                        
-                        if curr_col > 0 and board_copy[row][curr_col-1] == board_copy[row][curr_col] and not merged[curr_col-1]:
-                            board_copy[row][curr_col-1] *= 2
-                            board_copy[row][curr_col] = 0
-                            merged[curr_col-1] = True
-            
-            elif direction == "right":
-                for row in range(self.rows):
-                    merged = [False] * self.cols
-                    for col in range(self.cols-2, -1, -1):
-                        if board_copy[row][col] == 0:
-                            continue
-                        
-                        curr_col = col
-                        while curr_col < self.cols-1 and board_copy[row][curr_col+1] == 0:
-                            board_copy[row][curr_col+1] = board_copy[row][curr_col]
-                            board_copy[row][curr_col] = 0
-                            curr_col += 1
-                        
-                        if curr_col < self.cols-1 and board_copy[row][curr_col+1] == board_copy[row][curr_col] and not merged[curr_col+1]:
-                            board_copy[row][curr_col+1] *= 2
-                            board_copy[row][curr_col] = 0
-                            merged[curr_col+1] = True
-            
-            elif direction == "up":
-                for col in range(self.cols):
-                    merged = [False] * self.rows
-                    for row in range(1, self.rows):
-                        if board_copy[row][col] == 0:
-                            continue
-                        
-                        curr_row = row
-                        while curr_row > 0 and board_copy[curr_row-1][col] == 0:
-                            board_copy[curr_row-1][col] = board_copy[curr_row][col]
-                            board_copy[curr_row][col] = 0
-                            curr_row -= 1
-                        
-                        if curr_row > 0 and board_copy[curr_row-1][col] == board_copy[curr_row][col] and not merged[curr_row-1]:
-                            board_copy[curr_row-1][col] *= 2
-                            board_copy[curr_row][col] = 0
-                            merged[curr_row-1] = True
-            
-            elif direction == "down":
-                for col in range(self.cols):
-                    merged = [False] * self.rows
-                    for row in range(self.rows-2, -1, -1):
-                        if board_copy[row][col] == 0:
-                            continue
-                        
-                        curr_row = row
-                        while curr_row < self.rows-1 and board_copy[curr_row+1][col] == 0:
-                            board_copy[curr_row+1][col] = board_copy[curr_row][col]
-                            board_copy[curr_row][col] = 0
-                            curr_row += 1
-                        
-                        if curr_row < self.rows-1 and board_copy[curr_row+1][col] == board_copy[curr_row][col] and not merged[curr_row+1]:
-                            board_copy[curr_row+1][col] *= 2
-                            board_copy[curr_row][col] = 0
-                            merged[curr_row+1] = True
-            
-            # Check if board changed after move
-            if not np.array_equal(board, board_copy):
+            moved = self.try_move(direction, board_copy)
+            if moved:
                 return False
                 
         return True
+    
+    def try_move(self, direction, board):
+        """Test if a move is valid without actually making the move"""
+        board_changed = False
+        
+        if direction == "left":
+            for row in range(self.rows):
+                # Process each row left to right
+                merged = [False] * self.cols
+                for col in range(1, self.cols):
+                    if board[row][col] == 0:
+                        continue
+                    
+                    # Try to move left
+                    curr_col = col
+                    while curr_col > 0 and board[row][curr_col-1] == 0:
+                        board[row][curr_col-1] = board[row][curr_col]
+                        board[row][curr_col] = 0
+                        curr_col -= 1
+                        board_changed = True
+                    
+                    # Try to merge with the tile to the left
+                    if curr_col > 0 and board[row][curr_col-1] == board[row][curr_col] and not merged[curr_col-1]:
+                        board[row][curr_col-1] *= 2
+                        board[row][curr_col] = 0
+                        merged[curr_col-1] = True
+                        board_changed = True
+        
+        elif direction == "right":
+            for row in range(self.rows):
+                # Process each row right to left
+                merged = [False] * self.cols
+                for col in range(self.cols-2, -1, -1):
+                    if board[row][col] == 0:
+                        continue
+                    
+                    # Try to move right
+                    curr_col = col
+                    while curr_col < self.cols-1 and board[row][curr_col+1] == 0:
+                        board[row][curr_col+1] = board[row][curr_col]
+                        board[row][curr_col] = 0
+                        curr_col += 1
+                        board_changed = True
+                    
+                    # Try to merge with the tile to the right
+                    if curr_col < self.cols-1 and board[row][curr_col+1] == board[row][curr_col] and not merged[curr_col+1]:
+                        board[row][curr_col+1] *= 2
+                        board[row][curr_col] = 0
+                        merged[curr_col+1] = True
+                        board_changed = True
+        
+        elif direction == "up":
+            for col in range(self.cols):
+                # Process each column top to bottom
+                merged = [False] * self.rows
+                for row in range(1, self.rows):
+                    if board[row][col] == 0:
+                        continue
+                    
+                    # Try to move up
+                    curr_row = row
+                    while curr_row > 0 and board[curr_row-1][col] == 0:
+                        board[curr_row-1][col] = board[curr_row][col]
+                        board[curr_row][col] = 0
+                        curr_row -= 1
+                        board_changed = True
+                    
+                    # Try to merge with the tile above
+                    if curr_row > 0 and board[curr_row-1][col] == board[curr_row][col] and not merged[curr_row-1]:
+                        board[curr_row-1][col] *= 2
+                        board[curr_row][col] = 0
+                        merged[curr_row-1] = True
+                        board_changed = True
+        
+        elif direction == "down":
+            for col in range(self.cols):
+                # Process each column bottom to top
+                merged = [False] * self.rows
+                for row in range(self.rows-2, -1, -1):
+                    if board[row][col] == 0:
+                        continue
+                    
+                    # Try to move down
+                    curr_row = row
+                    while curr_row < self.rows-1 and board[curr_row+1][col] == 0:
+                        board[curr_row+1][col] = board[curr_row][col]
+                        board[curr_row][col] = 0
+                        curr_row += 1
+                        board_changed = True
+                    
+                    # Try to merge with the tile below
+                    if curr_row < self.rows-1 and board[curr_row+1][col] == board[curr_row][col] and not merged[curr_row+1]:
+                        board[curr_row+1][col] *= 2
+                        board[curr_row][col] = 0
+                        merged[curr_row+1] = True
+                        board_changed = True
+        
+        return board_changed
 
     def move_tiles(self, direction):
-        updated = True
-        blocks = set()
-        score_addition = 0
+        # Store the original board state to check if the move made a change
         original_board = self.get_state_matrix().copy()
-
+        
+        # Try the move on a copy of the board first to see if it's valid
+        board_copy = original_board.copy()
+        if not self.try_move(direction, board_copy):
+            return False  # No valid move
+            
+        # If move is valid, make the actual move
+        new_tiles = {}
+        
         if direction == "left":
-            sort_func = lambda x: x.col
-            reverse = False
-            delta = (-self.move_vel, 0)
-            boundary_check = lambda tile: tile.col == 0
-            get_next_tile = lambda tile: self.tiles.get(f"{tile.row}{tile.col - 1}")
-            merge_check = lambda tile, next_tile: tile.x > next_tile.x + self.move_vel
-            move_check = (
-                lambda tile, next_tile: tile.x > next_tile.x + self.tile_width + self.move_vel
-            )
-            ceil = True
+            for row in range(self.rows):
+                merged = [False] * self.cols
+                for col in range(self.cols):
+                    key = f"{row}{col}"
+                    if key in self.tiles:
+                        tile = self.tiles[key]
+                        curr_col = col
+                        
+                        # Move as far left as possible
+                        while curr_col > 0 and f"{row}{curr_col-1}" not in new_tiles:
+                            curr_col -= 1
+                        
+                        # Check for merge
+                        if curr_col > 0:
+                            left_key = f"{row}{curr_col-1}"
+                            if left_key in new_tiles and new_tiles[left_key].value == tile.value and not merged[curr_col-1]:
+                                # Merge with tile to the left
+                                new_tiles[left_key].value *= 2
+                                new_tiles[left_key].pulse_count = 3  # Trigger pulse animation for merged tile
+                                self.current_score += new_tiles[left_key].value
+                                merged[curr_col-1] = True
+                                continue
+                        
+                        # Place tile in new position
+                        new_key = f"{row}{curr_col}"
+                        tile.row = row
+                        tile.col = curr_col
+                        tile.x = curr_col * self.tile_width
+                        tile.y = row * self.tile_height + self.header_height
+                        new_tiles[new_key] = tile
+        
         elif direction == "right":
-            sort_func = lambda x: x.col
-            reverse = True
-            delta = (self.move_vel, 0)
-            boundary_check = lambda tile: tile.col == self.cols - 1
-            get_next_tile = lambda tile: self.tiles.get(f"{tile.row}{tile.col + 1}")
-            merge_check = lambda tile, next_tile: tile.x < next_tile.x - self.move_vel
-            move_check = (
-                lambda tile, next_tile: tile.x + self.tile_width + self.move_vel < next_tile.x
-            )
-            ceil = False
+            for row in range(self.rows):
+                merged = [False] * self.cols
+                for col in range(self.cols-1, -1, -1):
+                    key = f"{row}{col}"
+                    if key in self.tiles:
+                        tile = self.tiles[key]
+                        curr_col = col
+                        
+                        # Move as far right as possible
+                        while curr_col < self.cols-1 and f"{row}{curr_col+1}" not in new_tiles:
+                            curr_col += 1
+                        
+                        # Check for merge
+                        if curr_col < self.cols-1:
+                            right_key = f"{row}{curr_col+1}"
+                            if right_key in new_tiles and new_tiles[right_key].value == tile.value and not merged[curr_col+1]:
+                                # Merge with tile to the right
+                                new_tiles[right_key].value *= 2
+                                new_tiles[right_key].pulse_count = 3  # Trigger pulse animation for merged tile
+                                self.current_score += new_tiles[right_key].value
+                                merged[curr_col+1] = True
+                                continue
+                        
+                        # Place tile in new position
+                        new_key = f"{row}{curr_col}"
+                        tile.row = row
+                        tile.col = curr_col
+                        tile.x = curr_col * self.tile_width
+                        tile.y = row * self.tile_height + self.header_height
+                        new_tiles[new_key] = tile
+        
         elif direction == "up":
-            sort_func = lambda x: x.row
-            reverse = False
-            delta = (0, -self.move_vel)
-            boundary_check = lambda tile: tile.row == 0
-            get_next_tile = lambda tile: self.tiles.get(f"{tile.row - 1}{tile.col}")
-            merge_check = lambda tile, next_tile: tile.y > next_tile.y + self.move_vel
-            move_check = (
-                lambda tile, next_tile: tile.y > next_tile.y + self.tile_height + self.move_vel
-            )
-            ceil = True
+            for col in range(self.cols):
+                merged = [False] * self.rows
+                for row in range(self.rows):
+                    key = f"{row}{col}"
+                    if key in self.tiles:
+                        tile = self.tiles[key]
+                        curr_row = row
+                        
+                        # Move as far up as possible
+                        while curr_row > 0 and f"{curr_row-1}{col}" not in new_tiles:
+                            curr_row -= 1
+                        
+                        # Check for merge
+                        if curr_row > 0:
+                            up_key = f"{curr_row-1}{col}"
+                            if up_key in new_tiles and new_tiles[up_key].value == tile.value and not merged[curr_row-1]:
+                                # Merge with tile above
+                                new_tiles[up_key].value *= 2
+                                new_tiles[up_key].pulse_count = 3  # Trigger pulse animation for merged tile
+                                self.current_score += new_tiles[up_key].value
+                                merged[curr_row-1] = True
+                                continue
+                        
+                        # Place tile in new position
+                        new_key = f"{curr_row}{col}"
+                        tile.row = curr_row
+                        tile.col = col
+                        tile.x = col * self.tile_width
+                        tile.y = curr_row * self.tile_height + self.header_height
+                        new_tiles[new_key] = tile
+        
         elif direction == "down":
-            sort_func = lambda x: x.row
-            reverse = True
-            delta = (0, self.move_vel)
-            boundary_check = lambda tile: tile.row == self.rows - 1
-            get_next_tile = lambda tile: self.tiles.get(f"{tile.row + 1}{tile.col}")
-            merge_check = lambda tile, next_tile: tile.y < next_tile.y - self.move_vel
-            move_check = (
-                lambda tile, next_tile: tile.y + self.tile_height + self.move_vel < next_tile.y
-            )
-            ceil = False
-
-        while updated:
-            self.clock.tick(self.fps)
-            updated = False
-            sorted_tiles = sorted(self.tiles.values(), key=sort_func, reverse=reverse)
-
-            for i, tile in enumerate(sorted_tiles):
-                if boundary_check(tile):
-                    continue
-
-                next_tile = get_next_tile(tile)
-                if not next_tile:
-                    tile.move(delta)
-                elif (
-                    tile.value == next_tile.value
-                    and tile not in blocks
-                    and next_tile not in blocks
-                ):
-                    if merge_check(tile, next_tile):
-                        tile.move(delta)
-                    else:
-                        next_tile.value *= 2
-                        score_addition += next_tile.value
-                        sorted_tiles.pop(i)
-                        blocks.add(next_tile)
-                elif move_check(tile, next_tile):
-                    tile.move(delta)
-                else:
-                    continue
-
-                tile.set_pos(ceil)
-                updated = True
-
-            self.update_tiles(sorted_tiles)
-            self.draw()
-
+            for col in range(self.cols):
+                merged = [False] * self.rows
+                for row in range(self.rows-1, -1, -1):
+                    key = f"{row}{col}"
+                    if key in self.tiles:
+                        tile = self.tiles[key]
+                        curr_row = row
+                        
+                        # Move as far down as possible
+                        while curr_row < self.rows-1 and f"{curr_row+1}{col}" not in new_tiles:
+                            curr_row += 1
+                        
+                        # Check for merge
+                        if curr_row < self.rows-1:
+                            down_key = f"{curr_row+1}{col}"
+                            if down_key in new_tiles and new_tiles[down_key].value == tile.value and not merged[curr_row+1]:
+                                # Merge with tile below
+                                new_tiles[down_key].value *= 2
+                                new_tiles[down_key].pulse_count = 3  # Trigger pulse animation for merged tile
+                                self.current_score += new_tiles[down_key].value
+                                merged[curr_row+1] = True
+                                continue
+                        
+                        # Place tile in new position
+                        new_key = f"{curr_row}{col}"
+                        tile.row = curr_row
+                        tile.col = col
+                        tile.x = col * self.tile_width
+                        tile.y = curr_row * self.tile_height + self.header_height
+                        new_tiles[new_key] = tile
+        
+        # Update tiles dictionary
+        self.tiles = new_tiles
+        
         # Update score
-        self.current_score += score_addition
         if self.current_score > self.high_score:
             self.high_score = self.current_score
-
-        # Check if the board changed
+        
+        # Check if board changed
         new_board = self.get_state_matrix()
         if not np.array_equal(original_board, new_board):
             self.add_random_tile()
             self.game_over = self.check_game_over()
             return True
+        
         return False
 
     def update_tiles(self, sorted_tiles):
@@ -561,8 +657,8 @@ class Game2048:
             # Check for mouse clicks (for UI buttons)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-                # Check if AI button clicked
-                if 50 <= mouse_pos[0] <= 250 and 120 <= mouse_pos[1] <= 170:
+                # Check if AI button clicked - adjusted for new position
+                if 30 <= mouse_pos[0] <= 190 and 90 <= mouse_pos[1] <= 130:
                     self.is_ai_playing = not self.is_ai_playing
 
     def ai_move(self):
@@ -617,63 +713,53 @@ class Game2048:
 
 
 class Tile:
-    def __init__(self, value, row, col, tile_width, tile_height):
+    def __init__(self, value, row, col, tile_width, tile_height, header_height):
         self.value = value
         self.row = row
         self.col = col
         self.tile_width = tile_width
         self.tile_height = tile_height
+        self.header_height = header_height
         self.x = col * tile_width
-        self.y = row * tile_height + 200  # Offset for header
+        self.y = row * tile_height + header_height
         self.margin = 10
         self.border_radius = 10
         self.tile_anim_scale = 1.0
         self.pulse_count = 0
-
-    def draw(self, window, fonts, text_colors):
-        # Get color from Game2048.COLORS
-        color = Game2048.COLORS.get(self.value, (0, 0, 0))
         
-        # Calculate drawing rectangle with margin
-        rect = (
-            self.x + self.margin,
-            self.y + self.margin,
-            self.tile_width - 2 * self.margin,
-            self.tile_height - 2 * self.margin
+    def draw(self, window, fonts, text_colors):
+        # Calculate pulse animation effect
+        pulse_scale = 1.0
+        if self.pulse_count > 0:
+            # Pulsating effect - make the tile grow slightly and then return to normal
+            pulse_scale = 1.0 + (0.1 * (self.pulse_count / 3))
+            self.pulse_count -= 0.1
+            
+        # Calculate draw position and dimensions with pulse effect
+        x = self.x + self.margin + ((1 - pulse_scale) * self.tile_width / 2)
+        y = self.y + self.margin + ((1 - pulse_scale) * self.tile_height / 2)
+        width = (self.tile_width - 2 * self.margin) * pulse_scale
+        height = (self.tile_height - 2 * self.margin) * pulse_scale
+        
+        # Draw tile
+        rect = pygame.Rect(x, y, width, height)
+        pygame.draw.rect(
+            window, 
+            Game2048.COLORS.get(self.value, Game2048.COLORS[2048]), 
+            rect,
+            border_radius=self.border_radius
         )
         
-        # Draw the tile background
-        pygame.draw.rect(window, color, rect, border_radius=self.border_radius)
-        
-        # Draw the value
+        # Draw text
         if self.value > 0:
-            font = fonts.get(self.value, pygame.font.SysFont("Arial", 36, bold=True))
-            text_color = text_colors.get(self.value, (0, 0, 0))
-            text = font.render(str(self.value), True, text_color)
+            font = fonts.get(self.value, fonts[2048])
+            text = font.render(str(self.value), True, text_colors.get(self.value, (255, 255, 255)))
             
-            # Position text in center of tile
-            window.blit(
-                text,
-                (
-                    self.x + (self.tile_width / 2 - text.get_width() / 2),
-                    self.y + (self.tile_height / 2 - text.get_height() / 2),
-                ),
-            )
-
-    def move(self, delta):
-        self.x += delta[0]
-        self.y += delta[1]
-
-    def set_pos(self, ceil=False):
-        if ceil:
-            # Adjust for header offset when calculating row
-            adjusted_y = self.y - 200
-            self.row = math.ceil(adjusted_y / self.tile_height)
-            self.col = math.ceil(self.x / self.tile_width)
-        else:
-            adjusted_y = self.y - 200
-            self.row = math.floor(adjusted_y / self.tile_height)
-            self.col = math.floor(self.x / self.tile_width)
+            # Center text
+            text_x = x + (width - text.get_width()) / 2
+            text_y = y + (height - text.get_height()) / 2
+            
+            window.blit(text, (text_x, text_y))
 
 
 if __name__ == "__main__":
