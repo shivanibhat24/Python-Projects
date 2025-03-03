@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rubik's Cube RL Solver</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --card-bg: #fff;
+            --border-color: #ddd;
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #f5f5f5;
+            --card-bg: #2d2d2d;
+            --border-color: #444;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .control-panel {
+            flex: 0 0 350px;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .visualization {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .cube-view, .metrics {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .cube-view {
+            flex: 1;
+            min-height: 500px;
+            position: relative;
+        }
+
+        .metrics {
+            min-height: 300px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .status-display {
+            background-color: var(--bg-color);
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .status-value {
+            font-weight: bold;
+        }
+
+        .progress-container {
+            margin: 15px 0;
+        }
+
+        progress {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background-color: var(--bg-color);
+        }
+
+        progress::-webkit-progress-bar {
+            background-color: var(--bg-color);
+            border-radius: 5px;
+        }
+
+        progress::-webkit-progress-value {
+            background-color: var(--primary-color);
+            border-radius: 5px;
+        }
+
+        .btn-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn-full {
+            grid-column: span 2;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: 500;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Cube CSS */
+        .cube-container {
+            perspective: 1000px;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+        }
+
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(-30deg) rotateY(45deg);
+            transition: transform 0.5s;
+        }
+
+        .cube-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 4px;
+        }
+
+        .cube-face.front { transform: translateZ(150px); }
+        .cube-face.back { transform: rotateY(180deg) translateZ(150px); }
+        .cube-face.top { transform: rotateX(90deg) translateZ(150px); }
+        .cube-face.bottom { transform: rotateX(-90deg) translateZ(150px); }
+        .cube-face.left { transform: rotateY(-90deg) translateZ(150px); }
+        .cube-face.right { transform: rotateY(90deg) translateZ(150px); }
+
+        .sticker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        /* Camera Capture */
+        .capture-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .capture-content {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 800px;
+        }
+
+        .camera-view {
+            width: 100%;
+            height: 400px;
+            background-color: #000;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .capture-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .face-selection {
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .face-btn {
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .face-btn.active {
+            border-color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        /* Night mode toggle */
+        .mode-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        .toggle-checkbox {
+            opacity: 0;
+            position: absolute;
+        }
+
+        .toggle-label {
+            background-color: #111;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            position: relative;
+            height: 26px;
+            width: 50px;
+        }
+
+        .toggle-label .toggle-icon {
+            color: #f1c40f;
+            font-size: 14px;
+        }
+
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #f1f1f1;
+        }
+
+        .toggle-ball {
+            background-color: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            height: 22px;
+            width: 22px;
+            transform: translateX(0px);
+            transition: transform 0.2s linear;
+        }
+
+        .toggle-checkbox:checked + .toggle-label .toggle-ball {
+            transform: translateX(24px);
+            background-color: #333;
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Night mode toggle -->
+    <div class="mode-toggle">
+        <input type="checkbox" class="toggle-checkbox" id="darkmode-toggle">
+        <label for="darkmode-toggle" class="toggle-label">
+            <span class="toggle-icon">☀️</span>
+            <span class="toggle-icon">🌙</span>
+            <div class="toggle-ball"></div>
+        </label>
+    </div>
+
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2>Training Parameters</h2>
+            
+            <div class="form-group">
+                <label for="episodes">Episodes:</label>
+                <input type="number" id="episodes" value="1000">
+            </div>
+            
+            <div class="form-group">
+                <label for="learning-rate">Learning Rate:</label>
+                <input type="number" id="learning-rate" value="0.001" step="0.001">
+            </div>
+            
+            <div class="form-group">
+                <label for="gamma">Discount Factor (γ):</label>
+                <input type="number" id="gamma" value="0.99" step="0.01">
+            </div>
+            
+            <div class="form-group">
+                <label for="scramble-moves">Scramble Moves:</label>
+                <input type="number" id="scramble-moves" value="5">
+            </div>
+            
+            <h2>Status</h2>
+            <div class="status-display">
+                <div class="status-item">
+                    <span>Episodes Trained:</span>
+                    <span id="episodes-trained" class="status-value">0</span>
+                </div>
+                <div class="status-item">
+                    <span>Exploration Rate (ε):</span>
+                    <span id="epsilon" class="status-value">1.0000</span>
+                </div>
+                <div class="status-item">
+                    <span>Avg Reward (10 ep):</span>
+                    <span id="avg-reward" class="status-value">0.00</span>
+                </div>
+                <div class="status-item">
+                    <span>Avg Loss (10 ep):</span>
+                    <span id="avg-loss" class="status-value">0.0000</span>
+                </div>
+            </div>
+            
+            <div class="progress-container">
+                <label for="training-progress">Progress:</label>
+                <progress id="training-progress" value="0" max="100"></progress>
+            </div>
+            
+            <div class="btn-container">
+                <button id="train-btn" class="btn btn-primary btn-full">Start Training</button>
+                <button id="reset-btn" class="btn btn-secondary">Reset Cube</button>
+                <button id="scramble-btn" class="btn btn-secondary">Scramble Cube</button>
+                <button id="solve-btn" class="btn btn-primary">Solve Cube</button>
+                <button id="save-btn" class="btn btn-secondary">Save Model</button>
+                <button id="load-btn" class="btn btn-secondary">Load Model</button>
+                <button id="capture-btn" class="btn btn-primary btn-full">Solve My Cube</button>
+            </div>
+        </div>
+        
+        <!-- Visualization Area -->
+        <div class="visualization">
+            <div class="cube-view">
+                <div class="tabs">
+                    <div class="tab active" data-tab="cube">Cube</div>
+                    <div class="tab" data-tab="metrics">Training Metrics</div>
+                </div>
+                
+                <div id="cube-tab" class="tab-content active">
+                    <div class="cube-container">
+                        <div class="cube">
+                            <div class="cube-face front">
+                                <!-- 9 stickers for front face -->
+                                <div class="sticker" style="background-color: red;">F</div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                                <div class="sticker" style="background-color: red;"></div>
+                            </div>
+                            <div class="cube-face back">
+                                <!-- 9 stickers for back face -->
+                                <div class="sticker" style="background-color: orange;">B</div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                                <div class="sticker" style="background-color: orange;"></div>
+                            </div>
+                            <div class="cube-face top">
+                                <!-- 9 stickers for top face -->
+                                <div class="sticker" style="background-color: white;">U</div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                                <div class="sticker" style="background-color: white;"></div>
+                            </div>
+                            <div class="cube-face bottom">
+                                <!-- 9 stickers for bottom face -->
+                                <div class="sticker" style="background-color: yellow;">D</div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                                <div class="sticker" style="background-color: yellow;"></div>
+                            </div>
+                            <div class="cube-face left">
+                                <!-- 9 stickers for left face -->
+                                <div class="sticker" style="background-color: blue;">L</div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                                <div class="sticker" style="background-color: blue;"></div>
+                            </div>
+                            <div class="cube-face right">
+                                <!-- 9 stickers for right face -->
+                                <div class="sticker" style="background-color: green;">R</div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                                <div class="sticker" style="background-color: green;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="metrics-tab" class="tab-content">
+                    <canvas id="rewards-chart"></canvas>
+                    <canvas id="loss-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Capture Modal -->
+    <div class="capture-container" id="capture-modal">
+        <div class="capture-content">
+            <h2>Capture Your Cube</h2>
+            <p>Select a face and position it in front of the camera, then click "Capture".</p>
+            
+            <div class="face-selection">
+                <div class="face-btn active" data-face="top">Top (White)</div>
+                <div class="face-btn" data-face="bottom">Bottom (Yellow)</div>
+                <div class="face-btn" data-face="front">Front (Red)</div>
+                <div class="face-btn" data-face="back">Back (Orange)</div>
+                <div class="face-btn" data-face="left">Left (Blue)</div>
+                <div class="face-btn" data-face="right">Right (Green)</div>
+            </div>
+            
+            <div class="camera-view">
+                <video id="video" autoplay></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            
+            <div class="capture-buttons">
+                <button id="capture-image" class="btn btn-primary">Capture Face</button>
+                <button id="cancel-capture" class="btn btn-danger">Cancel</button>
+                <button id="process-cube" class="btn btn-secondary" disabled>Process & Solve</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // DOM Elements
+        const darkModeToggle = document.getElementById('darkmode-toggle');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const trainButton = document.getElementById('train-btn');
+        const resetButton = document.getElementById('reset-btn');
+        const scrambleButton = document.getElementById('scramble-btn');
+        const solveButton = document.getElementById('solve-btn');
+        const captureButton = document.getElementById('capture-btn');
+        const captureModal = document.getElementById('capture-modal');
+        const cancelCaptureButton = document.getElementById('cancel-capture');
+        const captureImageButton = document.getElementById('capture-image');
+        const processButton = document.getElementById('process-cube');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const notification = document.getElementById('notification');
+
+        // Application State
+        const state = {
+            isTraining: false,
+            episodesTrained: 0,
+            epsilon: 1.0,
+            avgReward: 0,
+            avgLoss: 0,
+            capturedFaces: {
+                top: null,
+                bottom: null,
+                front: null,
+                back: null,
+                left: null,
+                right: null
+            },
+            currentFace: 'top',
+            cubeState: initializeDefaultCubeState(),
+            rewards: [],
+            losses: []
+        };
+
+        // Charts
+        const rewardsChart = new Chart(
+            document.getElementById('rewards-chart'),
+            {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Episode Rewards',
+                        data: [],
+                        borderColor: '#3498db',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            }
+        );
+
+        const lossChart = new Chart(
+            document.getElementById('loss-chart'),
+            {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Training Loss',
+                        data: [],
+                        borderColor: '#e74c3c',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            }
+        );
+
+        // Initialize default cube state
+        function initializeDefaultCubeState() {
+            return {
+                top: Array(9).fill(0),     // White
+                bottom: Array(9).fill(1),  // Yellow
+                front: Array(9).fill(2),   // Red
+                back: Array(9).fill(3),    // Orange
+                left: Array(9).fill(4),    // Blue
+                right: Array(9).fill(5)    // Green
+            };
+        }
+
+        // Update UI with current state
+        function updateUI() {
+            document.getElementById('episodes-trained').textContent = state.episodesTrained;
+            document.getElementById('epsilon').textContent = state.epsilon.toFixed(4);
+            document.getElementById('avg-reward').textContent = state.avgReward.toFixed(2);
+            document.getElementById('avg-loss').textContent = state.avgLoss.toFixed(4);
+            document.getElementById('training-progress').value = state.isTraining ? (state.episodesTrained / parseInt(document.getElementById('episodes').value) * 100) : 0;
+            
+            // Update cube visualization
+            updateCubeVisualization();
+            
+            // Update charts
+            updateCharts();
+        }
+
+        // Update 3D cube visualization
+        function updateCubeVisualization() {
+            const colors = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+            const faces = ['top', 'bottom', 'front', 'back', 'left', 'right'];
+            
+            faces.forEach(face => {
+                const stickers = document.querySelectorAll(`.cube-face.${face} .sticker`);
+                state.cubeState[face].forEach((color, i) => {
+                    stickers[i].style.backgroundColor = colors[color];
+                });
+            });
+        }
+
+        // Update chart data
+        function updateCharts() {
+            if (state.rewards.length > 0) {
+                rewardsChart.data.labels = Array.from({ length: state.rewards.length }, (_, i) => i + 1);
+                rewardsChart.data.datasets[0].data = state.rewards;
+                rewardsChart.update();
+            }
+            
+            if (state.losses.length > 0) {
+                lossChart.data.labels = Array.from({ length: state.losses.length }, (_, i) => i + 1);
+                lossChart.data.datasets[0].data = state.losses;
+                lossChart.update();
+            }
+        }
+
+        // Simulate training process
+        function simulateTraining() {
+            if (!state.isTraining) return;
+            
+            const maxEpisodes = parseInt(document.getElementById('episodes').value);
+            const decayRate = 0.995;
+            
+            // Simulate one episode
+            state.episodesTrained++;
+            state.epsilon *= decayRate;
+            if (state.epsilon < 0.01) state.epsilon = 0.01;
+            
+            // Generate simulated reward (starts low, gradually increases)
+            const progress = state.episodesTrained / maxEpisodes;
+            const baseReward = -5 + (progress * 15); // -5 to 10 range
+            const randomFactor = Math.random() * 2 - 1; // -1 to 1
+            const reward = baseReward + randomFactor;
+            state.rewards.push(reward);
+            
+            // Calculate average reward over last 10 episodes
+            if (state.rewards.length > 0) {
+                const recentRewards = state.rewards.slice(-10);
+                state.avgReward = recentRewards.reduce((sum, r) => sum + r, 0) / recentRewards.length;
+            }
+            
+            // Generate simulated loss (starts high, gradually decreases)
+            const baseLoss = 2.0 - (progress * 1.8); // 2.0 to 0.2 range
+            const lossRandomFactor = Math.random() * 0.4 - 0.2; // -0.2 to 0.2
+            const loss = Math.max(0.05, baseLoss + lossRandomFactor);
+            state.losses.push(loss);
+            
+            // Calculate average loss over last 10 episodes
+            if (state.losses.length > 0) {
+                const recentLosses = state.losses.slice(-10);
+                state.avgLoss = recentLosses.reduce((sum, l) => sum + l, 0) / recentLosses.length;
+            }
+            
+            updateUI();
+            
+            // Continue training if not reached max episodes
+            if (state.episodesTrained < maxEpisodes && state.isTraining) {
+                setTimeout(simulateTraining, 100);
+            } else {
+                state.isTraining = false;
+                trainButton.textContent = 'Start Training';
+                showNotification('Training completed!');
+            }
+        }
+
+        // Scramble the cube
+        function scrambleCube() {
+            const moves = parseInt(document.getElementById('scramble-moves').value);
+            const faces = ['top', 'bottom', 'front', 'back', 'left', 'right'];
+            const actions = [rotateFaceClockwise, rotateFaceCounterClockwise];
+            
+            for (let i = 0; i < moves; i++) {
+                const randomFace = faces[Math.floor(Math.random() * faces.length)];
+                const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                randomAction(randomFace);
+            }
+            
+            updateCubeVisualization();
+            showNotification(`Cube scrambled with ${moves} random moves`);
+        }
+
+        // Rotate a face clockwise
+        function rotateFaceClockwise(face) {
+            // Get the current state of the face
+            const faceState = [...state.cubeState[face]];
+            
+            // Rotate the face (3x3 grid)
+            state.cubeState[face] = [
+                faceState[6], faceState[3], faceState[0],
+                faceState[7], faceState[4], faceState[1],
+                faceState[8], faceState[5], faceState[2]
+            ];
+            
+            // In a full implementation, we would also update adjacent faces
+            // This is a simplified version just for demonstration
+        }
+
+        // Rotate a face counter-clockwise
+        function rotateFaceCounterClockwise(face) {
+            // Get the current state of the face
+            const faceState = [...state.cubeState[face]];
+            
+            // Rotate the face (3x3 grid)
+            state.cubeState[face] = [
+                faceState[2], faceState[5], faceState[8],
+                faceState[1], faceState[4], faceState[7],
+                faceState[0], faceState[3], faceState[6]
+            ];
+            
+            // In a full implementation, we would also update adjacent faces
+            // This is a simplified version just for demonstration
+        }
+
+        // Reset the cube to solved state
+        // Reset the cube to solved state
+        function resetCube() {
+            state.cubeState = initializeDefaultCubeState();
+            updateCubeVisualization();
+            showNotification('Cube reset to solved state');
+        }
+
+        // Simulate solving the cube
+        function solveCube() {
+            // Placeholder for actual algorithm
+            // In practice, this would use the trained model to solve
+            showNotification('Solving cube...');
+            
+            const totalSteps = 10;
+            let currentStep = 0;
+            
+            function animateSolve() {
+                if (currentStep >= totalSteps) {
+                    resetCube();
+                    showNotification('Cube solved!');
+                    return;
+                }
+                
+                // Simulate a solving move
+                const faces = ['top', 'bottom', 'front', 'back', 'left', 'right'];
+                const randomFace = faces[Math.floor(Math.random() * faces.length)];
+                rotateFaceClockwise(randomFace);
+                updateCubeVisualization();
+                
+                currentStep++;
+                setTimeout(animateSolve, 300);
+            }
+            
+            animateSolve();
+        }
+
+        // Show notification
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Camera capture functions
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                showNotification('Camera initialized');
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                showNotification('Error accessing camera. Please check permissions.');
+            }
+        }
+
+        function captureImage() {
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Store captured face
+            state.capturedFaces[state.currentFace] = canvas.toDataURL('image/png');
+            
+            // Check if all faces are captured
+            const allFacesCaptured = Object.values(state.capturedFaces).every(face => face !== null);
+            processButton.disabled = !allFacesCaptured;
+            
+            showNotification(`${state.currentFace.charAt(0).toUpperCase() + state.currentFace.slice(1)} face captured`);
+        }
+
+        function processCapturedCube() {
+            // In a real application, this would analyze the captured images
+            // and determine the cube state
+            showNotification('Processing cube images...');
+            
+            // Simulate processing delay
+            setTimeout(() => {
+                captureModal.style.display = 'none';
+                resetCameraState();
+                
+                // Simulate detected cube state with random scramble
+                scrambleCube();
+                
+                // Show solution steps
+                setTimeout(solveCube, 1500);
+            }, 2000);
+        }
+
+        function resetCameraState() {
+            // Stop camera stream
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            // Reset captured faces
+            Object.keys(state.capturedFaces).forEach(face => {
+                state.capturedFaces[face] = null;
+            });
+            
+            processButton.disabled = true;
+        }
+
+        // Event Listeners
+        darkModeToggle.addEventListener('change', () => {
+            document.body.classList.toggle('dark-mode');
+        });
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+            });
+        });
+
+        trainButton.addEventListener('click', () => {
+            if (state.isTraining) {
+                state.isTraining = false;
+                trainButton.textContent = 'Start Training';
+                showNotification('Training paused');
+            } else {
+                state.isTraining = true;
+                trainButton.textContent = 'Stop Training';
+                showNotification('Training started');
+                simulateTraining();
+            }
+        });
+
+        resetButton.addEventListener('click', resetCube);
+        scrambleButton.addEventListener('click', scrambleCube);
+        solveButton.addEventListener('click', solveCube);
+
+        captureButton.addEventListener('click', () => {
+            captureModal.style.display = 'flex';
+            initCamera();
+        });
+
+        cancelCaptureButton.addEventListener('click', () => {
+            captureModal.style.display = 'none';
+            resetCameraState();
+        });
+
+        captureImageButton.addEventListener('click', captureImage);
+        processButton.addEventListener('click', processCapturedCube);
+
+        // Face selection buttons
+        document.querySelectorAll('.face-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.face-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.currentFace = btn.dataset.face;
+            });
+        });
+
+        // Save and load model handlers
+        document.getElementById('save-btn').addEventListener('click', () => {
+            if (state.episodesTrained === 0) {
+                showNotification('No trained model to save');
+                return;
+            }
+            
+            // In a real app, this would save the model weights
+            // Here we'll just create a dummy JSON
+            const modelData = {
+                episodesTrained: state.episodesTrained,
+                epsilon: state.epsilon,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(modelData));
+            const downloadLink = document.createElement('a');
+            downloadLink.setAttribute("href", dataStr);
+            downloadLink.setAttribute("download", "cube_solver_model.json");
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            showNotification('Model saved');
+        });
+
+        document.getElementById('load-btn').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = event => {
+                    try {
+                        const modelData = JSON.parse(event.target.result);
+                        state.episodesTrained = modelData.episodesTrained;
+                        state.epsilon = modelData.epsilon;
+                        
+                        updateUI();
+                        showNotification('Model loaded');
+                    } catch (error) {
+                        showNotification('Error loading model');
+                        console.error('Error parsing model data:', error);
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        });
+
+        // Drag to rotate cube
+        const cubeElement = document.querySelector('.cube');
+        let isDragging = false;
+        let previousX = 0;
+        let previousY = 0;
+        let rotationX = -30;
+        let rotationY = 45;
+
+        function updateCubeRotation() {
+            cubeElement.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+        }
+
+        document.querySelector('.cube-container').addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousX = e.clientX;
+            previousY = e.clientY;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - previousX;
+            const deltaY = e.clientY - previousY;
+            
+            rotationY += deltaX * 0.5;
+            rotationX -= deltaY * 0.5;
+            
+            updateCubeRotation();
+            
+            previousX = e.clientX;
+            previousY = e.clientY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Mobile touch support
+        document.querySelector('.cube-container').addEventListener('touchstart', (e) => {
+            isDragging = true;
+            previousX = e.touches[0].clientX;
+            previousY = e.touches[0].clientY;
+            e.preventDefault();
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.touches[0].clientX - previousX;
+            const deltaY = e.touches[0].clientY - previousY;
+            
+            rotationY += deltaX * 0.5;
+            rotationX -= deltaY * 0.5;
+            
+            updateCubeRotation();
+            
+            previousX = e.touches[0].clientX;
+            previousY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        // Initialize the application
+        function initialize() {
+            updateUI();
+            showNotification('Rubik\'s Cube RL Solver initialized');
+        }
+
+        // Run initialization when the page loads
+        initialize();
+    </script>
+</body>
+</html>
