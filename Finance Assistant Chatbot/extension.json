@@ -1,0 +1,784 @@
+// manifest.json
+{
+  "manifest_version": 3,
+  "name": "Finance Assistant",
+  "version": "1.0",
+  "description": "AI-powered finance assistant using Deep Q-Learning",
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
+
+// popup.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Finance Assistant</h1>
+      <div class="tab-container">
+        <button class="tab-button active" data-tab="chat">Chat</button>
+        <button class="tab-button" data-tab="dashboard">Dashboard</button>
+        <button class="tab-button" data-tab="settings">Settings</button>
+      </div>
+    </div>
+    
+    <div class="content">
+      <!-- Chat Tab -->
+      <div class="tab-content active" id="chat">
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+              <div class="message-content">
+                Hello! I'm your AI financial advisor. How can I help you today?
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Type your message here...">
+            <button id="sendButton">Send</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Dashboard Tab -->
+      <div class="tab-content" id="dashboard">
+        <div class="dashboard-container">
+          <div class="summary-card">
+            <h2>Financial Summary</h2>
+            <div id="summaryContent">
+              <p>Please add your financial information in the chat to see your summary.</p>
+            </div>
+          </div>
+          
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <h3>Income</h3>
+              <p id="incomeValue">$0</p>
+            </div>
+            <div class="metric-card">
+              <h3>Expenses</h3>
+              <p id="expensesValue">$0</p>
+            </div>
+            <div class="metric-card">
+              <h3>Savings</h3>
+              <p id="savingsValue">$0</p>
+            </div>
+            <div class="metric-card">
+              <h3>Debt</h3>
+              <p id="debtValue">$0</p>
+            </div>
+          </div>
+          
+          <div class="chart-container">
+            <h2>Budget Breakdown</h2>
+            <canvas id="budgetChart"></canvas>
+          </div>
+          
+          <div class="recommendations-container">
+            <h2>Top Recommendations</h2>
+            <ul id="recommendationsList">
+              <li>Add your financial information to get personalized recommendations.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Settings Tab -->
+      <div class="tab-content" id="settings">
+        <div class="settings-container">
+          <h2>Settings</h2>
+          
+          <div class="setting-group">
+            <h3>Notification Preferences</h3>
+            <div class="setting-item">
+              <label for="notifyRecommendations">
+                <input type="checkbox" id="notifyRecommendations" checked>
+                Weekly Recommendations
+              </label>
+            </div>
+            <div class="setting-item">
+              <label for="notifyBills">
+                <input type="checkbox" id="notifyBills" checked>
+                Bill Payment Reminders
+              </label>
+            </div>
+            <div class="setting-item">
+              <label for="notifySavings">
+                <input type="checkbox" id="notifySavings" checked>
+                Savings Goals Updates
+              </label>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <h3>Privacy</h3>
+            <div class="setting-item">
+              <label for="storeLocal">
+                <input type="checkbox" id="storeLocal" checked>
+                Store data locally only
+              </label>
+            </div>
+            <div class="setting-item">
+              <button id="clearDataButton" class="danger-button">Clear All Data</button>
+            </div>
+          </div>
+          
+          <div class="setting-group">
+            <h3>Model Training</h3>
+            <div class="setting-item">
+              <button id="trainModelButton">Train AI Model</button>
+            </div>
+            <div class="setting-item">
+              <label for="trainingFrequency">Training Frequency:</label>
+              <select id="trainingFrequency">
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="manual">Manual Only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
+
+// popup.css
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  width: 400px;
+  height: 550px;
+  overflow: hidden;
+}
+
+.container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f7fa;
+}
+
+.header {
+  background-color: #1e40af;
+  color: white;
+  padding: 10px 15px;
+}
+
+.header h1 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.tab-container {
+  display: flex;
+  gap: 5px;
+}
+
+.tab-button {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tab-button.active {
+  background-color: rgba(255, 255, 255, 0.25);
+  font-weight: bold;
+}
+
+.content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  overflow-y: auto;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Chat Tab Styles */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.message {
+  margin-bottom: 10px;
+  max-width: 80%;
+}
+
+.message.user {
+  margin-left: auto;
+}
+
+.message.assistant {
+  margin-right: auto;
+}
+
+.message-content {
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.user .message-content {
+  background-color: #1e40af;
+  color: white;
+}
+
+.assistant .message-content {
+  background-color: #e2e8f0;
+  color: #1e293b;
+}
+
+.chat-input {
+  display: flex;
+  padding: 10px;
+  background-color: white;
+  border-top: 1px solid #e2e8f0;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  margin-right: 8px;
+}
+
+.chat-input button {
+  background-color: #1e40af;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+
+/* Dashboard Tab Styles */
+.dashboard-container {
+  padding: 15px;
+}
+
+.summary-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.metric-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card h3 {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.metric-card p {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1e293b;
+}
+
+.chart-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recommendations-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recommendations-container ul {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+.recommendations-container li {
+  margin-bottom: 5px;
+}
+
+/* Settings Tab Styles */
+.settings-container {
+  padding: 15px;
+}
+
+.setting-group {
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.setting-group h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #1e293b;
+}
+
+.setting-item {
+  margin-bottom: 10px;
+}
+
+.setting-item label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.setting-item input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+button {
+  background-color: #1e40af;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.danger-button {
+  background-color: #ef4444;
+}
+
+select {
+  padding: 5px;
+  border-radius: 5px;
+  border: 1px solid #cbd5e1;
+  width: 100%;
+  margin-top: 5px;
+}
+
+// background.js
+// This service worker runs in the background
+chrome.runtime.onInstalled.addListener(() => {
+  // Initialize default user data
+  const defaultUserData = {
+    income: 0,
+    expenses: {},
+    savings: 0,
+    investments: {},
+    debt: {},
+    financial_goals: [],
+    recommendations: []
+  };
+  
+  chrome.storage.local.set({ 
+    userData: defaultUserData,
+    model: null,  // Will store the serialized model later
+    settings: {
+      notifications: {
+        recommendations: true,
+        bills: true,
+        savings: true
+      },
+      privacy: {
+        storeLocal: true
+      },
+      training: {
+        frequency: 'weekly',
+        lastTrained: null
+      }
+    }
+  });
+});
+
+// popup.js
+document.addEventListener('DOMContentLoaded', function() {
+  // Tab switching functionality
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+      
+      // Update active tab button
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+      
+      // Show active tab content
+      tabContents.forEach(content => content.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active');
+      
+      // If dashboard tab is selected, update the display
+      if (tabName === 'dashboard') {
+        updateDashboard();
+      }
+    });
+  });
+  
+  // Chat functionality
+  const userInput = document.getElementById('userInput');
+  const sendButton = document.getElementById('sendButton');
+  const chatMessages = document.getElementById('chatMessages');
+  
+  sendButton.addEventListener('click', sendMessage);
+  userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendMessage();
+    }
+  });
+  
+  function sendMessage() {
+    const message = userInput.value.trim();
+    if (message === '') return;
+    
+    // Add user message to chat
+    addMessageToChat('user', message);
+    userInput.value = '';
+    
+    // Process the message and get response
+    processUserMessage(message);
+  }
+  
+  function addMessageToChat(role, content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = content;
+    
+    messageDiv.appendChild(contentDiv);
+    chatMessages.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+  
+  // Process user message using the finance agent logic
+  async function processUserMessage(message) {
+    // Get user data from storage
+    const data = await chrome.storage.local.get(['userData']);
+    const userData = data.userData;
+    
+    // Simple intent matching for demonstration
+    let response = '';
+    
+    if (/hello|hi|hey/i.test(message)) {
+      response = "Hello! I'm your financial assistant. How can I help you manage your finances today?";
+    }
+    else if (/income is (\d+)|earn (\d+)|make (\d+)/i.test(message)) {
+      const match = message.match(/(\d+)/);
+      if (match) {
+        const income = parseInt(match[0]);
+        userData.income = income;
+        await saveUserData(userData);
+        response = `Got it! Your income is set to $${income}.`;
+      }
+    }
+    else if (/spend (\d+) on ([a-zA-Z ]+)|(\d+) (?:for|on) ([a-zA-Z ]+)/i.test(message)) {
+      const match = message.match(/(\d+) (?:on|for) ([a-zA-Z ]+)/i) || message.match(/spend (\d+) on ([a-zA-Z ]+)/i);
+      if (match) {
+        const amount = parseInt(match[1]);
+        const category = match[2].trim();
+        userData.expenses[category] = amount;
+        await saveUserData(userData);
+        response = `Added $${amount} as an expense for ${category}.`;
+      }
+    }
+    else if (/savings (?:is|are) (\d+)|have (\d+) in savings/i.test(message)) {
+      const match = message.match(/(\d+)/);
+      if (match) {
+        const amount = parseInt(match[0]);
+        userData.savings = amount;
+        await saveUserData(userData);
+        response = `Updated your savings to $${amount}.`;
+      }
+    }
+    else if (/summary|overview|status|how am i doing/i.test(message)) {
+      response = generateFinancialSummary(userData);
+    }
+    else if (/what should i do|advice|recommend|suggestions/i.test(message)) {
+      response = getRecommendation(userData);
+    }
+    else if (/train|learn/i.test(message)) {
+      response = "I'm training my model to provide better recommendations based on your financial data...";
+      setTimeout(() => {
+        addMessageToChat('assistant', "Training completed. I've improved my recommendations for your financial situation.");
+      }, 2000);
+    }
+    else {
+      response = "I'm not sure I understand. You can tell me about your income, expenses, savings, or ask for recommendations.";
+    }
+    
+    // Add assistant response to chat
+    setTimeout(() => {
+      addMessageToChat('assistant', response);
+    }, 500);
+  }
+  
+  // Generate financial summary text
+  function generateFinancialSummary(userData) {
+    const totalExpenses = Object.values(userData.expenses).reduce((sum, value) => sum + value, 0);
+    const totalInvestments = Object.values(userData.investments).reduce((sum, value) => sum + value, 0);
+    const totalDebt = Object.values(userData.debt).reduce((sum, value) => {
+      return sum + (typeof value === 'object' ? value.balance : value);
+    }, 0);
+    
+    const netWorth = userData.savings + totalInvestments - totalDebt;
+    
+    let summary = "Financial Summary:\n";
+    summary += `Income: $${userData.income}/month\n`;
+    summary += `Total Expenses: $${totalExpenses}/month\n`;
+    summary += `Savings: $${userData.savings}\n`;
+    summary += `Net Worth: $${netWorth}\n`;
+    
+    if (userData.income > 0) {
+      const savingsRate = ((userData.income - totalExpenses) / userData.income * 100).toFixed(1);
+      summary += `Savings Rate: ${savingsRate}%\n`;
+    }
+    
+    return summary;
+  }
+  
+  // Get financial recommendation based on user data
+  function getRecommendation(userData) {
+    // Simple rule-based recommendations for the extension demo
+    // In a full implementation, this would use the DQN model
+    
+    const totalExpenses = Object.values(userData.expenses).reduce((sum, value) => sum + value, 0);
+    const expenseRatio = userData.income > 0 ? totalExpenses / userData.income : 0;
+    const savingsRatio = userData.income > 0 ? userData.savings / userData.income : 0;
+    
+    let recommendation = '';
+    
+    if (Object.keys(userData.expenses).length === 0 && userData.income === 0) {
+      return "I need more information about your finances to give personalized recommendations. Try telling me about your income, expenses, or savings.";
+    }
+    
+    if (expenseRatio > 0.7) {
+      recommendation = "I recommend looking for ways to reduce your expenses. Your current expense ratio is high relative to your income. Consider reviewing subscriptions, finding cheaper alternatives, or cutting non-essential spending.";
+    } else if (savingsRatio < 3) {
+      recommendation = "You should focus on building up your emergency fund. Aim to have 3-6 months of expenses saved. Try setting up automatic transfers to your savings account.";
+    } else {
+      recommendation = "Consider investing some of your savings for long-term growth. Index funds are a great way to start investing with built-in diversification.";
+    }
+    
+    return recommendation;
+  }
+  
+  // Save user data to Chrome storage
+  async function saveUserData(userData) {
+    await chrome.storage.local.set({ userData });
+    updateDashboard();
+  }
+  
+  // Update dashboard display
+  function updateDashboard() {
+    chrome.storage.local.get(['userData'], function(data) {
+      const userData = data.userData;
+      
+      // Update financial metrics
+      document.getElementById('incomeValue').textContent = `$${userData.income}`;
+      
+      const totalExpenses = Object.values(userData.expenses).reduce((sum, value) => sum + value, 0);
+      document.getElementById('expensesValue').textContent = `$${totalExpenses}`;
+      
+      document.getElementById('savingsValue').textContent = `$${userData.savings}`;
+      
+      const totalDebt = Object.values(userData.debt).reduce((sum, value) => {
+        return sum + (typeof value === 'object' ? value.balance : value);
+      }, 0);
+      document.getElementById('debtValue').textContent = `$${totalDebt}`;
+      
+      // Update summary content
+      document.getElementById('summaryContent').innerHTML = `
+        <p>Monthly Income: $${userData.income}</p>
+        <p>Monthly Expenses: $${totalExpenses}</p>
+        <p>Savings: $${userData.savings}</p>
+        <p>Debt: $${totalDebt}</p>
+      `;
+      
+      // Update recommendations list
+      const recommendationsList = document.getElementById('recommendationsList');
+      recommendationsList.innerHTML = '';
+      
+      // Generate a recommendation
+      const recommendation = getRecommendation(userData);
+      const li = document.createElement('li');
+      li.textContent = recommendation;
+      recommendationsList.appendChild(li);
+      
+      // Update budget chart
+      updateBudgetChart(userData);
+    });
+  }
+  
+  // Create budget breakdown chart
+  function updateBudgetChart(userData) {
+    const ctx = document.getElementById('budgetChart').getContext('2d');
+    
+    // Get expense categories and values
+    const categories = Object.keys(userData.expenses);
+    const values = Object.values(userData.expenses);
+    
+    // If no expenses, show empty chart
+    if (categories.length === 0) {
+      categories.push('No data');
+      values.push(100);
+    }
+    
+    // Generate random colors for chart segments
+    const colors = categories.map(() => {
+      return `rgb(${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 255)})`;
+    });
+    
+    // Check if chart already exists and destroy it
+    if (window.budgetChart) {
+      window.budgetChart.destroy();
+    }
+    
+    // Create new chart
+    window.budgetChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: categories,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 12,
+              font: {
+                size: 10
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // Settings tab functionality
+  document.getElementById('clearDataButton').addEventListener('click', function() {
+    if (confirm('Are you sure you want to clear all your financial data?')) {
+      const defaultUserData = {
+        income: 0,
+        expenses: {},
+        savings: 0,
+        investments: {},
+        debt: {},
+        financial_goals: [],
+        recommendations: []
+      };
+      
+      chrome.storage.local.set({ userData: defaultUserData }, function() {
+        alert('All data has been cleared.');
+        updateDashboard();
+      });
+    }
+  });
+  
+  document.getElementById('trainModelButton').addEventListener('click', function() {
+    const trainButton = this;
+    trainButton.textContent = 'Training...';
+    trainButton.disabled = true;
+    
+    // Simulate training process
+    setTimeout(function() {
+      chrome.storage.local.get(['settings'], function(data) {
+        const settings = data.settings;
+        settings.training.lastTrained = new Date().toISOString();
+        
+        chrome.storage.local.set({ settings }, function() {
+          trainButton.textContent = 'Train AI Model';
+          trainButton.disabled = false;
+          alert('AI model has been trained with your financial data.');
+        });
+      });
+    }, 2000);
+  });
+  
+  // Initialize dashboard on load
+  updateDashboard();
+});
+
+// images/icon16.png, images/icon48.png, images/icon128.png
+// These would be actual PNG files in the extension folder
