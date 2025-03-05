@@ -1,7 +1,6 @@
 import pygame
 import pymunk
 import pymunk.pygame_util
-import pybullet as p
 import numpy as np
 import random
 import torch
@@ -12,10 +11,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 import gymnasium as gym
 from gymnasium import spaces
-import cv2
-import ray
 
-# Camera-based State Estimation
+# Camera-based State Estimation (simplified for Pygame)
 class CameraStateEstimator:
     def __init__(self, image_size=(224, 224)):
         self.image_size = image_size
@@ -36,15 +33,10 @@ class CameraStateEstimator:
         )
         return model
     
-    def capture_and_process_image(self, pybullet_client):
-        width, height = 640, 480
-        img_arr = pybullet_client.getCameraImage(
-            width, height, 
-            renderer=pybullet_client.ER_BULLET_HARDWARE_OPENGL
-        )
-        rgb_image = img_arr[2]
-        
-        image_tensor = torch.from_numpy(rgb_image).float() / 255.0
+    def capture_and_process_image(self, screen):
+        # Convert Pygame screen to tensor
+        screen_array = pygame.surfarray.array3d(screen)
+        image_tensor = torch.from_numpy(screen_array).float() / 255.0
         image_tensor = image_tensor.permute(2, 0, 1).unsqueeze(0)
         
         resized_image = torch.nn.functional.interpolate(
@@ -87,140 +79,40 @@ class AdvancedRewardShaper:
         return total_reward
     
     def _calculate_block_precision(self, env):
-        block_positions = [
-            p.getBasePositionAndOrientation(block['id'])[0] 
-            for block in env.blocks
-        ]
+        block_positions = [block.body.position for block in env.blocks]
         positional_variance = np.var(block_positions, axis=0)
         return 1.0 / (1 + np.mean(positional_variance))
     
     def _calculate_complexity_bonus(self, env):
-        orientations = [
-            p.getEulerFromQuaternion(
-                p.getBasePositionAndOrientation(block['id'])[1]
-            ) 
-            for block in env.blocks
-        ]
-        
+        orientations = [block.body.angle for block in env.blocks]
         orientation_complexity = np.std(orientations)
         return np.exp(-orientation_complexity)
     
     def _calculate_risk_penalty(self, env):
-        velocities = [
-            p.getBaseVelocity(block['id'])[0] 
-            for block in env.blocks
-        ]
-        
+        velocities = [block.body.velocity for block in env.blocks]
         max_velocity = np.max(np.abs(velocities))
         return max_velocity
 
-# Transfer Learning Support
-class JengaTransferLearner:
-    def __init__(self, base_model_path=None):
-        self.base_model = self._load_or_create_base_model(base_model_path)
-        
-    def _load_or_create_base_model(self, model_path):
-        if model_path:
-            try:
-                return PPO.load(model_path)
-            except Exception as e:
-                print(f"Could not load base model: {e}")
-        
-        env = DummyVecEnv([lambda: AdvancedJengaEnvironment()])
-        return PPO("MultiInputPolicy", env)
-    
-    def fine_tune(self, new_environment, training_steps=50000):
-        transfer_policy_kwargs = dict(
-            activation_fn=torch.nn.ReLU,
-            net_arch=[
-                dict(shared=[256, 128], 
-                     pi=[64], 
-                     vf=[64])
-            ]
-        )
-        
-        fine_tuned_model = PPO(
-            "MultiInputPolicy",
-            new_environment,
-            policy_kwargs=transfer_policy_kwargs,
-            learning_rate=5e-5,
-            **self.base_model.get_parameters()
-        )
-        
-        fine_tuned_model.learn(total_timesteps=training_steps)
-        return fine_tuned_model
-
-# Multi-Agent Training
-class MultiAgentJengaTrainer:
-    def __init__(self, num_agents=4):
-        ray.init(num_cpus=num_agents)
-        self.num_agents = num_agents
-        self.environments = [AdvancedJengaEnvironment() for _ in range(num_agents)]
-    
-    @ray.remote
-    def train_agent(self, agent_id):
-        env = self.environments[agent_id]
-        
-        model = PPO(
-            "MultiInputPolicy", 
-            env,
-            verbose=0,
-            learning_rate=1e-4
-        )
-        
-        model.learn(
-            total_timesteps=50000,
-            callback=self._create_collaborative_callback(agent_id)
-        )
-        
-        return {
-            'agent_id': agent_id,
-            'final_performance': self._evaluate_agent(model, env)
-        }
-    
-    def _create_collaborative_callback(self, agent_id):
-        class CollaborativeCallback(BaseCallback):
-            def __init__(self, agent_id, verbose=0):
-                super().__init__(verbose)
-                self.agent_id = agent_id
-            
-            def _on_step(self):
-                if self.num_timesteps % 1000 == 0:
-                    print(f"Agent {self.agent_id} progress: {self.num_timesteps}")
-                return True
-        
-        return CollaborativeCallback(agent_id)
-    
-    def _evaluate_agent(self, model, env):
-        obs, _ = env.reset()
-        total_reward = 0
-        
-        for _ in range(100):
-            action, _ = model.predict(obs)
-            obs, reward, done, _, _ = env.step(action)
-            total_reward += reward
-            
-            if done:
-                break
-        
-        return total_reward
-    
-    def parallel_training(self):
-        agent_futures = [self.train_agent.remote(i) for i in range(self.num_agents)]
-        return ray.get(agent_futures)
-
-# Modified AdvancedJengaEnvironment with enhanced capabilities
+# Advanced Jenga Environment
 class AdvancedJengaEnvironment(gym.Env):
-    def __init__(self, render_mode=True, max_steps=100):
+    def __init__(self, render_mode=True, max_steps=100, screen_width=800, screen_height=600):
         super().__init__()
         
-        # Enhanced physics setup
-        self.client = p.connect(p.GUI if render_mode else p.DIRECT)
-        p.setGravity(0, -9.81, 0)
-        p.setPhysicsEngineParameter(
-            fixedTimeStep=1/240.0,
-            numSolverIterations=200
-        )
+        # Pygame and Pymunk setup
+        pygame.init()
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        
+        # Setup screen for rendering
+        self.screen = pygame.display.set_mode((screen_width, screen_height))
+        pygame.display.set_caption("Jenga AI Simulation")
+        
+        # Pymunk space setup
+        self.space = pymunk.Space()
+        self.space.gravity = (0, 980)  # Pymunk uses pixels per second squared
+        
+        # Draw options for Pymunk
+        self.draw_options = pymunk.pygame_util.DrawOptions(self.screen)
         
         # Camera state estimator
         self.camera_estimator = CameraStateEstimator()
@@ -228,23 +120,27 @@ class AdvancedJengaEnvironment(gym.Env):
         # Advanced reward shaper
         self.reward_shaper = AdvancedRewardShaper()
         
-        # Rest of the original initialization...
+        # Environment parameters
         self.max_steps = max_steps
         self.current_step = 0
         
-        # More complex action space
+        # Block and tower parameters
+        self.block_width = 75
+        self.block_height = 25
+        self.blocks = []
+        
+        # Action and observation spaces
         self.action_space = spaces.Dict({
             'block_index': spaces.Discrete(54),
-            'extraction_angle': spaces.Box(low=-np.pi, high=np.pi, shape=(1,)),
-            'extraction_force': spaces.Box(low=0, high=10, shape=(1,))
+            'extraction_x': spaces.Box(low=0, high=self.screen_width, shape=(1,)),
+            'extraction_y': spaces.Box(low=0, high=self.screen_height, shape=(1,))
         })
         
-        # Enhanced observation space
         self.observation_space = spaces.Dict({
             'block_states': spaces.Box(
                 low=-np.inf, 
                 high=np.inf, 
-                shape=(54, 7),
+                shape=(54, 4),  # pos_x, pos_y, angle, velocity
                 dtype=np.float32
             ),
             'tower_stability': spaces.Box(
@@ -254,35 +150,98 @@ class AdvancedJengaEnvironment(gym.Env):
             ),
             'camera_features': spaces.Box(
                 low=-np.inf, high=np.inf,
-                shape=(256,),  # Matches feature extractor output
+                shape=(256,),
                 dtype=np.float32
             )
         })
         
-        self.blocks = []
-        self.tower_height = 0
+        # Create initial tower
+        self._create_tower()
+        self._create_ground()
+    
+    def _create_ground(self):
+        # Create ground body
+        ground_body = self.space.static_body
+        ground_shape = pymunk.Segment(ground_body, (0, self.screen_height-50), 
+                                      (self.screen_width, self.screen_height-50), 5)
+        ground_shape.friction = 0.5
+        self.space.add(ground_shape)
+    
+    def _create_tower(self):
+        # Create Jenga tower with alternate layer orientations
+        for layer in range(9):  # 9 layers
+            y_offset = self.screen_height - 100 - layer * self.block_height * 1.1
+            horizontal_direction = layer % 2 == 0
+            
+            for i in range(3):  # 3 blocks per layer
+                mass = 1
+                moment = pymunk.moment_for_box(mass, (self.block_width, self.block_height))
+                body = pymunk.Body(mass, moment)
+                
+                if horizontal_direction:
+                    body.position = (
+                        self.screen_width/2 + (i-1) * self.block_width, 
+                        y_offset
+                    )
+                    shape = pymunk.Poly.create_box(body, (self.block_width, self.block_height))
+                else:
+                    body.position = (
+                        self.screen_width/2 + (i-1) * self.block_height, 
+                        y_offset
+                    )
+                    shape = pymunk.Poly.create_box(body, (self.block_height, self.block_width))
+                
+                shape.friction = 0.5
+                shape.elasticity = 0.1
+                self.space.add(body, shape)
+                self.blocks.append(shape)
+    
+    def _calculate_tower_stability(self):
+        # Calculate tower stability based on block positions and velocities
+        velocities = [np.linalg.norm(block.body.velocity) for block in self.blocks]
+        height_variation = np.std([block.body.position.y for block in self.blocks])
+        
+        # Stability is high when velocities are low and height variation is minimal
+        stability = max(0, 1 - np.mean(velocities)/100 - height_variation/100)
+        return stability
     
     def reset(self, seed=None):
         super().reset(seed=seed)
-        p.resetSimulation()
         
-        self.blocks = self._create_advanced_jenga_tower()
-        self.current_step = 0
+        # Clear existing bodies
+        for block in self.blocks:
+            self.space.remove(block.body, block)
+        self.blocks.clear()
         
-        # Capture initial camera features
-        camera_features = self.camera_estimator.capture_and_process_image(p)
+        # Recreate tower
+        self._create_tower()
         
+        # Capture initial state
+        camera_features = self._capture_camera_features()
         observation = self._get_comprehensive_observation(camera_features)
+        
         return observation, {}
+    
+    def _capture_camera_features(self):
+        # Render current state to screen
+        self.screen.fill((255, 255, 255))
+        self.space.debug_draw(self.draw_options)
+        pygame.display.flip()
+        
+        # Get camera features
+        return self.camera_estimator.capture_and_process_image(self.screen)
     
     def _get_comprehensive_observation(self, camera_features):
         block_states = []
         
         for block in self.blocks:
-            pos, ori = p.getBasePositionAndOrientation(block['id'])
-            linear_vel, angular_vel = p.getBaseVelocity(block['id'])
-            
-            block_state = list(pos) + list(ori) + list(linear_vel)
+            # Extract key block state information
+            block_state = [
+                block.body.position.x, 
+                block.body.position.y, 
+                block.body.angle, 
+                np.linalg.norm(block.body.velocity)
+            ]
             block_states.append(block_state)
         
         stability_score = self._calculate_tower_stability()
@@ -296,30 +255,38 @@ class AdvancedJengaEnvironment(gym.Env):
     def step(self, action):
         self.current_step += 1
         
-        # Original step logic with enhanced reward calculation
+        # Extract action parameters
         block_index = action['block_index']
-        angle = action['extraction_angle'][0]
-        force = action['extraction_force'][0]
+        extraction_x = action['extraction_x'][0]
+        extraction_y = action['extraction_y'][0]
         
-        block = self.blocks[block_index]
-        p.applyExternalForce(
-            block['id'], 
-            -1,
-            [np.cos(angle) * force, 0, np.sin(angle) * force],
-            p.getBasePositionAndOrientation(block['id'])[0],
-            p.BASE_LINK
+        # Apply force to selected block
+        selected_block = self.blocks[block_index]
+        force_magnitude = 500
+        force_direction = pymunk.Vec2d(
+            extraction_x - selected_block.body.position.x,
+            extraction_y - selected_block.body.position.y
+        ).normalized()
+        
+        selected_block.body.apply_force_at_local_point(
+            force_direction * force_magnitude, 
+            (0, 0)
         )
         
-        p.stepSimulation()
+        # Step physics simulation
+        for _ in range(10):  # Substeps for more stable physics
+            self.space.step(0.01)
         
         # Capture camera features
-        camera_features = self.camera_estimator.capture_and_process_image(p)
+        camera_features = self._capture_camera_features()
         
+        # Get observation
         observation = self._get_comprehensive_observation(camera_features)
         
-        # Advanced reward calculation
+        # Calculate reward
         reward = self.reward_shaper.calculate_reward(self)
         
+        # Check termination conditions
         terminated = (
             observation['tower_stability'][0] < 0.1 or
             self.current_step >= self.max_steps
@@ -328,15 +295,21 @@ class AdvancedJengaEnvironment(gym.Env):
         truncated = False
         
         return observation, reward, terminated, truncated, {}
+    
+    def render(self):
+        # Render current physics state
+        self.screen.fill((255, 255, 255))
+        self.space.debug_draw(self.draw_options)
+        pygame.display.flip()
+    
+    def close(self):
+        pygame.quit()
 
-# Main training function
+# Training function
 def train_advanced_jenga_agent():
-    # Create environment with enhanced capabilities
+    # Create environment
     env = AdvancedJengaEnvironment(render_mode=True)
     env = DummyVecEnv([lambda: env])
-    
-    # Transfer learning support
-    transfer_learner = JengaTransferLearner()
     
     # Custom neural network architecture
     policy_kwargs = dict(
@@ -361,25 +334,28 @@ def train_advanced_jenga_agent():
     
     # Train with enhanced learning
     model.learn(
-        total_timesteps=100000, 
-        callback=CustomCallback()
+        total_timesteps=100000
     )
     
-    # Optional: Fine-tune on a slightly modified environment
-    modified_env = AdvancedJengaEnvironment(render_mode=False)
-    fine_tuned_model = transfer_learner.fine_tune(modified_env)
-    
-    return model, fine_tuned_model
+    return model
 
 def main():
-    # Train advanced Jenga agent
-    trained_model, fine_tuned_model = train_advanced_jenga_agent()
+    # Train Jenga agent
+    trained_model = train_advanced_jenga_agent()
     
-    # Multi-agent training demonstration
-    multi_agent_trainer = MultiAgentJengaTrainer(num_agents=4)
-    multi_agent_results = multi_agent_trainer.parallel_training()
+    # Optional: Demonstration of model
+    env = AdvancedJengaEnvironment(render_mode=True)
+    obs, _ = env.reset()
     
-    print("Multi-Agent Training Results:", multi_agent_results)
+    for _ in range(100):
+        action, _ = trained_model.predict(obs)
+        obs, reward, done, _, _ = env.step(action)
+        env.render()
+        
+        if done:
+            break
+    
+    env.close()
 
 if __name__ == "__main__":
     main()
