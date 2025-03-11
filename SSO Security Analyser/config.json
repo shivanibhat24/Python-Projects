@@ -1,0 +1,14 @@
+{
+  "headless": false,
+  "login_page": "/signin",
+  "username_field": "email",
+  "password_field": "pass",
+  "submit_button": "login-btn",
+  "success_indicator": "user-dashboard",
+  "test_credentials": {
+    "valid_user": {"username": "test@example.com", "password": "test_password"},
+    "admin_user": {"username": "admin@example.com", "password": "admin_password"}
+  },
+  "redirect_uri": "https://your-app.com/callback",
+  "client_id": "your_client_id"
+}
