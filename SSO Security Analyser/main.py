@@ -704,3 +704,6 @@ if __name__ == "__main__":
     
     tester = SSOSecurityTester(args.url, args.config)
     tester.run_all_tests()
+    
+    tester = SSOSecurityTester(args.url, args.config)
+    tester.run_all_tests()
