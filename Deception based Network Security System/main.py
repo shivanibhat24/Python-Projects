@@ -802,3 +802,622 @@ class SMBHoneypot(BaseHoneypot):
             # Log SMB packet
             event_manager.log_event(
                 addr[0], "0.0.0.0", "SMB",
+                "packet", 
+                data.hex(),
+                "reconnaissance"
+            )
+            
+            # Send a fake SMB response
+            # This is a simplified response - in a real implementation, you would parse the SMB packet
+            # and respond appropriately based on the SMB protocol
+            time.sleep(1)  # Simulate processing time
+            
+            # Send a generic error response
+            error_response = bytes.fromhex("000000a5ff534d4272000000001843c80000000000000000000000000000ffff") + \
+                            bytes.fromhex("ffffffff000000000000000000000000000000000000") + \
+                            bytes.fromhex("00000000000000000000000000000000")
+            
+            client.send(error_response)
+            time.sleep(0.5)
+            client.close()
+            
+        except Exception as e:
+            logger.error(f"Error handling SMB client: {e}")
+            client.close()
+
+# TCP Tarpit
+class TCPTarpit:
+    def __init__(self, ports):
+        self.ports = ports
+        self.running = False
+        self.threads = []
+        logger.info(f"Initialized TCP tarpit on ports {ports}")
+    
+    def start(self):
+        self.running = True
+        for port in self.ports:
+            thread = threading.Thread(target=self.run_tarpit, args=(port,))
+            thread.daemon = True
+            thread.start()
+            self.threads.append(thread)
+            logger.info(f"Started TCP tarpit on port {port}")
+    
+    def stop(self):
+        self.running = False
+        for thread in self.threads:
+            thread.join(timeout=1)
+        logger.info(f"Stopped TCP tarpit")
+    
+    def run_tarpit(self, port):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', port))
+        sock.listen(5)
+        
+        while self.running:
+            try:
+                client, addr = sock.accept()
+                client_thread = threading.Thread(target=self._handle_tarpit_client, args=(client, addr, port))
+                client_thread.daemon = True
+                client_thread.start()
+            except Exception as e:
+                logger.error(f"Error in TCP tarpit: {e}")
+        
+        sock.close()
+    
+    def _handle_tarpit_client(self, client, addr, port):
+        try:
+            service_map = {
+                25: "SMTP",
+                110: "POP3",
+                143: "IMAP",
+                587: "SMTP"
+            }
+            
+            service = service_map.get(port, f"TCP:{port}")
+            
+            event_manager.log_event(
+                addr[0], "0.0.0.0", service, 
+                "tarpit_connection", 
+                None,
+                "tarpit"
+            )
+            
+            # Set a very small TCP window size
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1)
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1)
+            
+            # Send an initial banner extremely slowly
+            banner = ""
+            if port == 25 or port == 587:
+                banner = "220 mail.example.com ESMTP\r\n"
+            elif port == 110:
+                banner = "+OK POP3 server ready\r\n"
+            elif port == 143:
+                banner = "* OK IMAP4rev1 Server Ready\r\n"
+            else:
+                banner = f"Welcome to service on port {port}\r\n"
+            
+            # Send the banner one byte at a time with delays
+            for byte in banner.encode():
+                client.send(bytes([byte]))
+                time.sleep(1)  # 1 second delay between each byte
+            
+            # Continue the tarpit by accepting data but responding extremely slowly
+            try:
+                while self.running:
+                    data = client.recv(1)
+                    if not data:
+                        break
+                    
+                    # Log received data
+                    event_manager.log_event(
+                        addr[0], "0.0.0.0", service, 
+                        "tarpit_data", 
+                        data.hex(),
+                        "tarpit"
+                    )
+                    
+                    # Respond with single character and long delay
+                    response = b"."
+                    time.sleep(5)  # 5 second delay for each response
+                    client.send(response)
+            except socket.timeout:
+                pass
+            
+        except Exception as e:
+            logger.error(f"Error handling tarpit client: {e}")
+        finally:
+            client.close()
+
+# HTTP Tarpit
+class HTTPTarpit:
+    def __init__(self, ports):
+        self.ports = ports
+        self.running = False
+        self.threads = []
+        logger.info(f"Initialized HTTP tarpit on ports {ports}")
+    
+    def start(self):
+        self.running = True
+        for port in self.ports:
+            thread = threading.Thread(target=self.run_tarpit, args=(port,))
+            thread.daemon = True
+            thread.start()
+            self.threads.append(thread)
+            logger.info(f"Started HTTP tarpit on port {port}")
+    
+    def stop(self):
+        self.running = False
+        for thread in self.threads:
+            thread.join(timeout=1)
+        logger.info(f"Stopped HTTP tarpit")
+    
+    def run_tarpit(self, port):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', port))
+        sock.listen(5)
+        
+        while self.running:
+            try:
+                client, addr = sock.accept()
+                client_thread = threading.Thread(target=self._handle_http_tarpit, args=(client, addr))
+                client_thread.daemon = True
+                client_thread.start()
+            except Exception as e:
+                logger.error(f"Error in HTTP tarpit: {e}")
+        
+        sock.close()
+    
+    def _handle_http_tarpit(self, client, addr):
+        try:
+            # Log connection
+            event_manager.log_event(
+                addr[0], "0.0.0.0", "HTTP", 
+                "tarpit_connection", 
+                None,
+                "tarpit"
+            )
+            
+            # Receive the request
+            data = client.recv(4096)
+            if not data:
+                client.close()
+                return
+            
+            # Log the request
+            request = data.decode('utf-8', errors='ignore')
+            event_manager.log_event(
+                addr[0], "0.0.0.0", "HTTP", 
+                "tarpit_request", 
+                request,
+                "tarpit"
+            )
+            
+            # Send HTTP headers very slowly
+            headers = [
+                "HTTP/1.1 200 OK",
+                "Server: Apache/2.4.41 (Ubuntu)",
+                "Content-Type: text/html; charset=UTF-8",
+                "Connection: keep-alive",
+                # Don't specify content-length to keep connection open
+            ]
+            
+            # Send each header with delay
+            for header in headers:
+                client.send(f"{header}\r\n".encode())
+                time.sleep(1)
+            
+            # Send an empty line to indicate the end of headers
+            client.send(b"\r\n")
+            
+            # Start sending an "infinite" HTML document
+            client.send(b"<html><head><title>Loading...</title></head><body><h1>Loading page, please wait...</h1><div>")
+            
+            # Send tiny chunks of data with long delays
+            counter = 0
+            try:
+                while self.running and counter < 1000:  # Limit to 1000 iterations
+                    time.sleep(2)
+                    client.send(f"<!-- Loading data chunk {counter} -->\n".encode())
+                    counter += 1
+            except:
+                pass
+            
+        except Exception as e:
+            logger.error(f"Error handling HTTP tarpit: {e}")
+        finally:
+            client.close()
+
+# Packet capture and network monitoring
+class NetworkMonitor:
+    def __init__(self, honeypot_subnet, production_subnets):
+        self.honeypot_subnet = honeypot_subnet
+        self.production_subnets = production_subnets
+        self.running = False
+        self.thread = None
+        self.alert_counts = {}  # IP -> count
+        self.alert_threshold = 5
+        logger.info(f"Initialized network monitor for subnet {honeypot_subnet}")
+    
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._monitor_traffic)
+        self.thread.daemon = True
+        self.thread.start()
+        logger.info("Started network monitor")
+    
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1)
+        logger.info("Stopped network monitor")
+    
+    def _monitor_traffic(self):
+        try:
+            # Use scapy to sniff traffic
+            sniff(filter=f"net {self.honeypot_subnet}", prn=self._process_packet, store=0)
+        except Exception as e:
+            logger.error(f"Error in network monitor: {e}")
+    
+    def _process_packet(self, packet):
+        if not self.running:
+            return
+        
+        try:
+            if IP in packet:
+                src_ip = packet[IP].src
+                dst_ip = packet[IP].dst
+                
+                # Check if traffic is between honeypot and production network
+                if self._is_in_subnet(src_ip, self.honeypot_subnet) and any(self._is_in_subnet(dst_ip, subnet) for subnet in self.production_subnets):
+                    # This is potentially an attempt to pivot from honeypot to production
+                    logger.warning(f"Potential pivot attempt from {src_ip} to {dst_ip}")
+                    
+                    # Increment alert count
+                    self.alert_counts[src_ip] = self.alert_counts.get(src_ip, 0) + 1
+                    
+                    # Log the event
+                    proto = "TCP" if TCP in packet else "UDP" if UDP in packet else "IP"
+                    
+                    event_manager.log_event(
+                        src_ip, dst_ip, proto, 
+                        "potential_pivot", 
+                        packet.summary(),
+                        "lateral_movement"
+                    )
+                    
+                    # Check if threshold exceeded
+                    if self.alert_counts.get(src_ip, 0) >= self.alert_threshold:
+                        logger.critical(f"ALERT: Threshold exceeded for {src_ip} - potential attack in progress")
+                        # Reset counter
+                        self.alert_counts[src_ip] = 0
+                        
+                        # Here you would typically trigger an alert or notification
+                        # In a real system, you might integrate with an alerting platform
+                        
+        except Exception as e:
+            logger.error(f"Error processing packet: {e}")
+    
+    def _is_in_subnet(self, ip, subnet):
+        try:
+            return ipaddress.ip_address(ip) in ipaddress.ip_network(subnet)
+        except:
+            return False
+
+# Web interface for monitoring
+class WebInterface:
+    def __init__(self, port=8000):
+        self.port = port
+        self.app = Flask(__name__)
+        self.running = False
+        self.thread = None
+        
+        # Set up routes
+        self.app.route("/")(self.index)
+        self.app.route("/api/events")(self.api_events)
+        self.app.route("/api/stats")(self.api_stats)
+    
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._run_server)
+        self.thread.daemon = True
+        self.thread.start()
+        logger.info(f"Started web interface on port {self.port}")
+    
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1)
+        logger.info("Stopped web interface")
+    
+    def _run_server(self):
+        try:
+            self.app.run(host='0.0.0.0', port=self.port, debug=False, use_reloader=False)
+        except Exception as e:
+            logger.error(f"Error in web interface: {e}")
+    
+    def index(self):
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Deception System Dashboard</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                h1 { color: #333; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                th { background-color: #f2f2f2; }
+                tr:hover { background-color: #f5f5f5; }
+                .dashboard { display: flex; flex-wrap: wrap; }
+                .panel { flex: 1; min-width: 300px; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+            </style>
+            <script>
+                function loadEvents() {
+                    fetch('/api/events')
+                        .then(response => response.json())
+                        .then(data => {
+                            const table = document.getElementById('events-table');
+                            table.innerHTML = '<tr><th>Time</th><th>Source</th><th>Destination</th><th>Service</th><th>Activity</th><th>Classification</th></tr>';
+                            
+                            data.forEach(event => {
+                                const row = table.insertRow();
+                                row.innerHTML = `
+                                    <td>${event.timestamp}</td>
+                                    <td>${event.source_ip}</td>
+                                    <td>${event.destination_ip}</td>
+                                    <td>${event.service}</td>
+                                    <td>${event.activity}</td>
+                                    <td>${event.classification}</td>
+                                `;
+                            });
+                        });
+                }
+                
+                function loadStats() {
+                    fetch('/api/stats')
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById('total-events').textContent = data.total_events;
+                            document.getElementById('attack-sources').textContent = data.unique_sources;
+                            document.getElementById('top-services').textContent = data.top_services.join(', ');
+                            document.getElementById('top-activities').textContent = data.top_activities.join(', ');
+                        });
+                }
+                
+                // Load data when page loads
+                window.onload = function() {
+                    loadEvents();
+                    loadStats();
+                    
+                    // Refresh every 30 seconds
+                    setInterval(loadEvents, 30000);
+                    setInterval(loadStats, 30000);
+                };
+            </script>
+        </head>
+        <body>
+            <h1>Deception System Dashboard</h1>
+            
+            <div class="dashboard">
+                <div class="panel">
+                    <h2>System Stats</h2>
+                    <p>Total Events: <span id="total-events">Loading...</span></p>
+                    <p>Unique Attack Sources: <span id="attack-sources">Loading...</span></p>
+                    <p>Top Services: <span id="top-services">Loading...</span></p>
+                    <p>Top Activities: <span id="top-activities">Loading...</span></p>
+                </div>
+                
+                <div class="panel">
+                    <h2>System Status</h2>
+                    <p>Honeypots: Active</p>
+                    <p>Tarpits: Active</p>
+                    <p>Monitoring: Active</p>
+                    <p>Last Update: <span id="last-update"></span></p>
+                    <script>
+                        document.getElementById('last-update').textContent = new Date().toLocaleString();
+                    </script>
+                </div>
+            </div>
+            
+            <h2>Recent Events</h2>
+            <table id="events-table">
+                <tr><th>Time</th><th>Source</th><th>Destination</th><th>Service</th><th>Activity</th><th>Classification</th></tr>
+                <tr><td colspan="6">Loading...</td></tr>
+            </table>
+        </body>
+        </html>
+        """
+    
+    def api_events(self):
+        events = event_manager.get_recent_events(100)
+        result = []
+        for event in events:
+            result.append({
+                "id": event[0],
+                "timestamp": event[1],
+                "source_ip": event[2],
+                "destination_ip": event[3],
+                "service": event[4],
+                "activity": event[5],
+                "classification": event[7]
+            })
+        return jsonify(result)
+    
+    def api_stats(self):
+        events = event_manager.get_recent_events(1000)
+        
+        # Calculate stats
+        sources = set()
+        services = {}
+        activities = {}
+        
+        for event in events:
+            sources.add(event[2])  # source_ip
+            
+            service = event[4]
+            services[service] = services.get(service, 0) + 1
+            
+            activity = event[5]
+            activities[activity] = activities.get(activity, 0) + 1
+        
+        # Get top services and activities
+        top_services = sorted(services.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_activities = sorted(activities.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        return jsonify({
+            "total_events": len(events),
+            "unique_sources": len(sources),
+            "top_services": [s[0] for s in top_services],
+            "top_activities": [a[0] for a in top_activities]
+        })
+
+# Main Deception System Class
+class DeceptionSystem:
+    def __init__(self):
+        self.config_manager = ConfigManager()
+        self.config = self.config_manager.get_config()
+        
+        # Setup database
+        self.db_conn = setup_database()
+        global event_manager
+        event_manager = EventManager(self.db_conn)
+        
+        # Initialize components
+        self._init_components()
+    
+    def _init_components(self):
+        self.honeypots = []
+        self.tarpits = []
+        
+        # Create honeypots
+        if self.config["honeypots"]["ssh"]["enabled"]:
+            self.honeypots.append(SSHHoneypot(
+                self.config["honeypots"]["ssh"]["ports"],
+                self.config["honeypots"]["ssh"]["interaction_level"]
+            ))
+        
+        if self.config["honeypots"]["web"]["enabled"]:
+            self.honeypots.append(HTTPHoneypot(
+                self.config["honeypots"]["web"]["ports"],
+                self.config["honeypots"]["web"]["interaction_level"]
+            ))
+        
+        if self.config["honeypots"]["ftp"]["enabled"]:
+            self.honeypots.append(FTPHoneypot(
+                self.config["honeypots"]["ftp"]["ports"],
+                self.config["honeypots"]["ftp"]["interaction_level"]
+            ))
+        
+        if self.config["honeypots"]["smb"]["enabled"]:
+            self.honeypots.append(SMBHoneypot(
+                self.config["honeypots"]["smb"]["ports"],
+                self.config["honeypots"]["smb"]["interaction_level"]
+            ))
+        
+        # Create tarpits
+        if self.config["tarpits"]["tcp"]["enabled"]:
+            self.tarpits.append(TCPTarpit(
+                self.config["tarpits"]["tcp"]["ports"]
+            ))
+        
+        if self.config["tarpits"]["http"]["enabled"]:
+            self.tarpits.append(HTTPTarpit(
+                self.config["tarpits"]["http"]["ports"]
+            ))
+        
+        # Create network monitor
+        self.network_monitor = NetworkMonitor(
+            self.config["network"]["honeypot_subnet"],
+            self.config["network"]["production_subnets"]
+        )
+        
+        # Create web interface
+        self.web_interface = WebInterface()
+    
+    def start(self):
+        logger.info("Starting Deception System...")
+        
+        # Start honeypots
+        for honeypot in self.honeypots:
+            honeypot.start()
+        
+        # Start tarpits
+        for tarpit in self.tarpits:
+            tarpit.start()
+        
+        # Start network monitor
+        self.network_monitor.start()
+        
+        # Start web interface
+        self.web_interface.start()
+        
+        logger.info("Deception System started successfully")
+    
+    def stop(self):
+        logger.info("Stopping Deception System...")
+        
+        # Stop honeypots
+        for honeypot in self.honeypots:
+            honeypot.stop()
+        
+        # Stop tarpits
+        for tarpit in self.tarpits:
+            tarpit.stop()
+        
+        # Stop network monitor
+        self.network_monitor.stop()
+        
+        # Stop web interface
+        self.web_interface.stop()
+        
+        # Close database connection
+        self.db_conn.close()
+        
+        logger.info("Deception System stopped")
+    
+    def status(self):
+        status = {
+            "honeypots": [],
+            "tarpits": [],
+            "network_monitor": "running" if self.network_monitor.running else "stopped",
+            "web_interface": "running" if self.web_interface.running else "stopped"
+        }
+        
+        for honeypot in self.honeypots:
+            status["honeypots"].append({
+                "service": honeypot.service_name,
+                "ports": honeypot.ports,
+                "interaction_level": honeypot.interaction_level,
+                "status": "running" if honeypot.running else "stopped"
+            })
+        
+        for tarpit in self.tarpits:
+            tarpit_type = "HTTP" if isinstance(tarpit, HTTPTarpit) else "TCP"
+            status["tarpits"].append({
+                "type": tarpit_type,
+                "ports": tarpit.ports,
+                "status": "running" if tarpit.running else "stopped"
+            })
+        
+        return status
+
+# Main entry point
+if __name__ == "__main__":
+    # Create and start the deception system
+    system = DeceptionSystem()
+    
+    try:
+        system.start()
+        
+        # Keep the main thread running
+        while True:
+            time.sleep(1)
+    
+    except KeyboardInterrupt:
+        print("\nShutting down Deception System...")
+    
+    finally:
+        system.stop()
