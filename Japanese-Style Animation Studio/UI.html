@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sakura AI Studio - Anime Style Transfer</title>
+    <style>
+        :root {
+            --primary: #ff7eb3;
+            --secondary: #7e5aff;
+            --dark: #333;
+            --light: #fff;
+            --accent: #ff3860;
+            --background: #fdf6f9;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--background);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header Styles */
+        header {
+            background-color: var(--light);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo img {
+            height: 50px;
+        }
+        
+        .logo h1 {
+            font-size: 24px;
+            color: var(--secondary);
+            font-weight: 700;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 30px;
+        }
+        
+        nav a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        nav a:hover {
+            color: var(--primary);
+        }
+        
+        /* Hero Section */
+        .hero {
+            padding: 100px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: var(--secondary);
+        }
+        
+        .hero p {
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+        
+        .cta-button {
+            background-color: var(--primary);
+            color: var(--light);
+            border: none;
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .cta-button:hover {
+            background-color: var(--accent);
+            transform: translateY(-3px);
+        }
+        
+        /* Style Transformer Section */
+        .transformer {
+            padding: 80px 0;
+            background-color: var(--light);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+        }
+        
+        .transformer h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 40px;
+            color: var(--secondary);
+        }
+        
+        .transform-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .input-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .output-section {
+            flex: 2;
+            min-width: 300px;
+        }
+        
+        .dropzone {
+            border: 2px dashed var(--primary);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .dropzone:hover {
+            background-color: rgba(126, 90, 255, 0.05);
+        }
+        
+        .dropzone p {
+            margin: 10px 0;
+        }
+        
+        .preview-image {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            margin-top: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .style-options {
+            margin-top: 30px;
+        }
+        
+        .style-options h3 {
+            margin-bottom: 15px;
+        }
+        
+        .styles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .style-option {
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        
+        .style-option img {
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: 8px;
+        }
+        
+        .style-option.selected {
+            border-color: var(--accent);
+            transform: scale(1.05);
+        }
+        
+        .style-option:hover {
+            transform: translateY(-5px);
+        }
+        
+        .transform-controls {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .transform-controls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .transform-button {
+            background-color: var(--secondary);
+            color: var(--light);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        
+        .transform-button:hover {
+            background-color: var(--accent);
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .result-card {
+            background-color: var(--light);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        
+        .result-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .result-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        
+        .result-info {
+            padding: 15px;
+        }
+        
+        .result-info h4 {
+            margin-bottom: 5px;
+            color: var(--secondary);
+        }
+        
+        .result-info p {
+            font-size: 14px;
+            color: var(--dark);
+        }
+        
+        .download-button {
+            display: inline-block;
+            background-color: var(--primary);
+            color: var(--light);
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 80px 0;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 50px;
+            color: var(--secondary);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .feature-card {
+            background-color: var(--light);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+        
+        .feature-icon {
+            font-size: 40px;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        .feature-card h3 {
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+        
+        /* Testimonials */
+        .testimonials {
+            padding: 80px 0;
+            background-color: var(--light);
+        }
+        
+        .testimonials h2 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 50px;
+            color: var(--secondary);
+        }
+        
+        .testimonial-slider {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .testimonial-card {
+            background-color: var(--background);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin: 0 auto;
+            max-width: 600px;
+        }
+        
+        .testimonial-content {
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+        
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .testimonial-author img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .author-info h4 {
+            margin-bottom: 5px;
+        }
+        
+        .author-info p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Footer */
+        footer {
+            background-color: var(--dark);
+            color: var(--light);
+            padding: 60px 0 30px;
+        }
+        
+        .footer-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .footer-column {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .footer-column h3 {
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        .footer-column ul {
+            list-style: none;
+        }
+        
+        .footer-column li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-column a {
+            color: var(--light);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-column a:hover {
+            color: var(--primary);
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Cherry Blossom Animation */
+        .blossom-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+        
+        .cherry-blossom {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 0 C60 25 75 40 100 50 C75 60 60 75 50 100 C40 75 25 60 0 50 C25 40 40 25 50 0" fill="%23ffcce6"/></svg>');
+            background-size: contain;
+            opacity: 0.8;
+            animation-name: fall, sway;
+            animation-timing-function: linear, ease-in-out;
+            animation-iteration-count: infinite;
+            animation-direction: normal, alternate;
+        }
+        
+        @keyframes fall {
+            0% {
+                top: -10%;
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
+        }
+        
+        @keyframes sway {
+            0% {
+                margin-left: 0px;
+            }
+            100% {
+                margin-left: 50px;
+            }
+        }
+        
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 5px solid rgba(255, 126, 179, 0.2);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .transform-container {
+                flex-direction: column;
+            }
+            
+            .feature-card,
+            .result-card {
+                transform: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="blossom-container" id="header-blossoms"></div>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <svg width="50" height="50" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="#ff7eb3" />
+                        <path d="M50 15 C55 30 70 45 85 50 C70 55 55 70 50 85 C45 70 30 55 15 50 C30 45 45 30 50 15" fill="#fff" />
+                    </svg>
+                    <h1>Sakura AI Studio</h1>
+                </div>
+                <nav>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#transformer">Transform</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#gallery">Gallery</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero" id="home">
+        <div class="blossom-container" id="hero-blossoms"></div>
+        <div class="container">
+            <h2>Transform Your Photos Into Beautiful Anime Art</h2>
+            <p>Experience the magic of AI-powered anime style transfer. Choose from iconic studio styles like Ghibli, KyoAni, Trigger, MAPPA, and Ufotable.</p>
+            <a href="#transformer" class="cta-button">Try It Now</a>
+        </div>
+    </section>
+
+    <section class="transformer" id="transformer">
+        <div class="container">
+            <h2>Anime Style Transformer</h2>
+            <div class="transform-container">
+                <div class="input-section">
+                    <div class="dropzone" id="drop-zone">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#7e5aff" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Drag and drop an image here</p>
+                        <p>or</p>
+                        <label for="file-input" class="cta-button">Select a file</label>
+                        <input type="file" id="file-input" accept="image/*" style="display: none;">
+                    </div>
+                    <img id="preview-image" class="preview-image" style="display: none;">
+                    
+                    <div class="style-options">
+                        <h3>Select Style</h3>
+                        <div class="styles-grid">
+                            <div class="style-option" data-style="Ghibli">
+                                <img src="/api/placeholder/100/70" alt="Ghibli style">
+                                <p>Ghibli</p>
+                            </div>
+                            <div class="style-option" data-style="KyoAni">
+                                <img src="/api/placeholder/100/70" alt="KyoAni style">
+                                <p>KyoAni</p>
+                            </div>
+                            <div class="style-option" data-style="Trigger">
+                                <img src="/api/placeholder/100/70" alt="Trigger style">
+                                <p>Trigger</p>
+                            </div>
+                            <div class="style-option" data-style="MAPPA">
+                                <img src="/api/placeholder/100/70" alt="MAPPA style">
+                                <p>MAPPA</p>
+                            </div>
+                            <div class="style-option" data-style="Ufotable">
+                                <img src="/api/placeholder/100/70" alt="Ufotable style">
+                                <p>Ufotable</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="transform-controls">
+                        <label>
+                            <input type="checkbox" id="animate-checkbox">
+                            Create animation
+                        </label>
+                        <div id="animation-options" style="display: none; margin-top: 10px;">
+                            <label>
+                                Frames:
+                                <input type="number" id="frames-input" min="12" max="60" value="24" style="width: 60px;">
+                            </label>
+                            <label>
+                                <input type="checkbox" id="transition-checkbox" checked>
+                                Transition between styles
+                            </label>
+                        </div>
+                        <button id="transform-button" class="transform-button" disabled>Transform</button>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <div class="loading" id="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Processing your image...</p>
+                    </div>
+                    
+                    <div id="results" class="results-grid"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="container">
+            <h2>Stunning Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Multiple Anime Styles</h3>
+                    <p>Choose from iconic anime studios including Studio Ghibli, KyoAni, Trigger, MAPPA, and Ufotable, each with its unique visual style.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">✨</div>
+                    <h3>Advanced AI Technology</h3>
+                    <p>Our state-of-the-art deep learning model preserves the content of your images while applying authentic anime stylization.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎬</div>
+                    <h3>Animation Creation</h3>
+                    <p>Create stunning animations that transition between different anime styles, perfect for social media content.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🖼️</div>
+                    <h3>High-Quality Output</h3>
+                    <p>Get beautiful high-resolution images that maintain the details of your original photo while applying anime aesthetics.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>Mobile Friendly</h3>
+                    <p>Transform your photos on any device - our platform works seamlessly on desktop, tablet, and mobile.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Fast Processing</h3>
+                    <p>Our optimized backend ensures quick processing times, so you don't have to wait long for your anime transformations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonials">
+        <div class="container">
+            <h2>What Our Users Say</h2>
+            <div class="testimonial-slider">
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        "I've tried many anime style transfer tools, but Sakura AI Studio offers the most authentic results. The Ghibli style transformation is so accurate - it really captures that magical essence!"
+                    </div>
+                    <div class="testimonial-author">
+                        <img src="/api/placeholder/50/50" alt="User avatar">
+                        <div class="author-info">
+                            <h4>Yuki Tanaka</h4>
+                            <p>Digital Artist</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>Sakura AI Studio</h3>
+                    <p>Transforming reality into anime art with the power of AI. Experience the magic of style transfer technology.</p>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#transformer">Transform</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#gallery">Gallery</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Resources</h3>
+                    <ul>
+                        <li><a href="#">API Documentation</a></li>
+                        <li><a href="#">Developer Guide</a></li>
+                        <li><a href="#">FAQ</a></li>
+                        <li><a href="#">Blog</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Contact</h3>
+                    <ul>
+                        <li>Email: contact@sakuraai.studio</li>
+                        <li>Phone: +81 3 1234 5678</li>
+                        <li>Address: Shibuya, Tokyo, Japan</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>© 2025 Sakura AI Studio. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Cherry Blossom Animation
+        function createCherryBlossoms(containerId, count = 20) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            // Clear any existing blossoms
+            container.innerHTML = '';
+            
+            for (let i = 0; i < count; i++) {
+                const blossom = document.createElement('div');
+                blossom.className = 'cherry-blossom';
+                
+                // Random size between 10px and 25px
+                const size = 10 + Math.random() * 15;
+                blossom.style.width = `${size}px`;
+                blossom.style.height = `${size}px`;
+                
+                // Random starting position
+                const startPos = Math.random() * 100;
+                blossom.style.left = `${startPos}%`;
+                
+                // Random fall duration between 10s and 25s
+                const fallDuration = 10 + Math.random() * 15;
+                blossom.style.animationDuration = `${fallDuration}s, ${(3 + Math.random() * 4)}s`;
+                
+                // Random delay
+                const delay = Math.random() * 15;
+                blossom.style.animationDelay = `${delay}s, ${delay}s`;
+                
+                // Random rotation
+                blossom.style.transform = `rotate(${Math.random() * 360}deg)`;
+                
+                container.appendChild(blossom);
+            }
+        }
+        
+        // Initialize cherry blossoms
+        window.addEventListener('DOMContentLoaded', () => {
+            createCherryBlossoms('header-blossoms', 15);
+            createCherryBlossoms('hero-blossoms', 30);
+            
+            // Refresh blossoms periodically
+            setInterval(() => {
+                createCherryBlossoms('header-blossoms', 15);
+                createCherryBlossoms('hero-blossoms', 30);
+            }, 20000);
+        });
+        
+        // File Upload Functionality
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewImage = document.getElementById('preview-image');
+        const transformButton = document.getElementById('transform-button');
+        const animateCheckbox = document.getElementById('animate-checkbox');
+        const animationOptions = document.getElementById('animation-options');
+        const styleOptions = document.querySelectorAll('.style-option');
+        const resultsContainer = document.getElementById('results');
+        const loadingIndicator = document.getElementById('loading');
+        
+        // Show/hide animation options
+        animateCheckbox.addEventListener('change', () => {
+            animationOptions.style.display = animateCheckbox.checked ? 'block' : 'none';
+        });
+        
+        // Handle file selection
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file && file.type.match('image.*')) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                    transformButton.disabled = false;
+                }
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Style selection
+        styleOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // Deselect all
+                styleOptions.forEach(opt => opt.classList.remove('selected'));
+                // Select clicked
+                option.classList.add('selected');
+            });
+        });
+        
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = 'rgba(126, 90, 255, 0.1)';
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.backgroundColor = '';
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.match('image.*')) {
+                fileInput.files = files;
+                handleFileSelect({ target: { files: files } });
+            }
+        });
+        
+        // Handle transform button click
+        transformButton.addEventListener('click', async () => {
+            if (!previewImage.src) return;
+            
+            // Get selected style
+            let selectedStyle = null;
+            styleOptions.forEach(option => {
+                if (option.classList.contains('selected')) {
+                    selectedStyle = option.dataset.style;
+                }
+            });
+            
+            // Animation options
+            const animated = animateCheckbox.checked;
+            const frames = document.getElementById('frames-input').value;
+            const transition = document.getElementById('transition-checkbox').checked;
+            
+            // Show loading
+            loadingIndicator.style.display = 'block';
+            resultsContainer.innerHTML = '';
+            
+            try {
+                // Mock API call (in a real implementation, you'd send data to your backend)
+                await mockApiCall(previewImage.src, selectedStyle, animated, frames, transition);
+                
+                // Display results
+                loadingIndicator.style.display = 'none';
+                
+                if (animated) {
+                    // Show animation result
+                    const resultCard = document.createElement('div');
+                    resultCard.className = 'result-card';
+                    resultCard.innerHTML = `
+                        <img src="${previewImage.src}" class="result-image">
+                        <div class="result-info">
+                            <h4>Anime Animation</h4>
+                            <p>Style: ${selectedStyle || 'Mixed Transition'}</p>
+                            <p>Frames: ${frames}</p>
+                            <a href="#" class="download-button">Download GIF</a>
+                            <a href="#" class="download-button">Download MP4</a>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(resultCard);
+                // Continue from where the code was cut off (in the transformButton event listener)
+            } else {
+                    // Show single image result
+                    const resultCard = document.createElement('div');
+                    resultCard.className = 'result-card';
+                    resultCard.innerHTML = `
+                        <img src="${previewImage.src}" class="result-image">
+                        <div class="result-info">
+                            <h4>Anime Style Transfer</h4>
+                            <p>Style: ${selectedStyle || 'Default'}</p>
+                            <a href="#" class="download-button">Download Image</a>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(resultCard);
+                }
+            } catch (error) {
+                // Handle error
+                loadingIndicator.style.display = 'none';
+                alert('An error occurred during transformation. Please try again.');
+                console.error('Transform error:', error);
+            }
+        });
+        
+        // Mock API call function (simulates backend processing)
+        async function mockApiCall(imageData, style, animated, frames, transition) {
+            // In a real implementation, you would send this data to your backend
+            // For demo purposes, we'll just wait a few seconds to simulate processing
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    console.log('API call completed with:', {
+                        styleApplied: style,
+                        animated: animated,
+                        frames: frames,
+                        transition: transition
+                    });
+                    resolve();
+                }, 3000); // 3 second delay to simulate processing
+            });
+        }
+
+        // Adding a gallery section dynamically
+        function createGallery() {
+            const gallerySection = document.createElement('section');
+            gallerySection.id = 'gallery';
+            gallerySection.className = 'features';
+            
+            const galleryHTML = `
+                <div class="container">
+                    <h2>Community Gallery</h2>
+                    <div class="results-grid">
+                        ${generateGalleryItems()}
+                    </div>
+                    <div style="text-align: center; margin-top: 40px;">
+                        <button class="cta-button">View More</button>
+                    </div>
+                </div>
+            `;
+            
+            gallerySection.innerHTML = galleryHTML;
+            
+            // Insert gallery before testimonials
+            const testimonialsSection = document.querySelector('.testimonials');
+            document.body.insertBefore(gallerySection, testimonialsSection);
+        }
+        
+        function generateGalleryItems() {
+            // Styles for our gallery
+            const styles = ['Ghibli', 'KyoAni', 'Trigger', 'MAPPA', 'Ufotable'];
+            
+            let galleryHTML = '';
+            
+            // Generate 6 gallery items
+            for (let i = 0; i < 6; i++) {
+                const style = styles[i % styles.length];
+                galleryHTML += `
+                    <div class="result-card">
+                        <img src="/api/placeholder/300/200" class="result-image" alt="Gallery example ${i+1}">
+                        <div class="result-info">
+                            <h4>${style} Style</h4>
+                            <p>By User${Math.floor(Math.random() * 1000)}</p>
+                            <p>${Math.floor(Math.random() * 100) + 10} likes</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return galleryHTML;
+        }
+        
+        // Create testimonial slider
+        function initializeTestimonialSlider() {
+            const testimonials = [
+                {
+                    content: "I've tried many anime style transfer tools, but Sakura AI Studio offers the most authentic results. The Ghibli style transformation is so accurate - it really captures that magical essence!",
+                    name: "Yuki Tanaka",
+                    profession: "Digital Artist"
+                },
+                {
+                    content: "The animation feature is absolutely incredible! I created a stunning transition between MAPPA and Trigger styles that got thousands of likes on social media.",
+                    name: "Alex Johnson",
+                    profession: "Content Creator"
+                },
+                {
+                    content: "As an anime fan, I'm impressed by how well this AI captures the unique style of each studio. The Ufotable transformation gave my landscape photos that gorgeous painted quality.",
+                    name: "Mei Zhang",
+                    profession: "Photographer"
+                }
+            ];
+            
+            let currentTestimonial = 0;
+            const testimonialContainer = document.querySelector('.testimonial-card');
+            
+            // Create navigation dots
+            const sliderNav = document.createElement('div');
+            sliderNav.className = 'slider-nav';
+            sliderNav.style.textAlign = 'center';
+            sliderNav.style.marginTop = '20px';
+            
+            for (let i = 0; i < testimonials.length; i++) {
+                const dot = document.createElement('span');
+                dot.style.display = 'inline-block';
+                dot.style.width = '12px';
+                dot.style.height = '12px';
+                dot.style.borderRadius = '50%';
+                dot.style.backgroundColor = i === 0 ? 'var(--primary)' : '#ccc';
+                dot.style.margin = '0 5px';
+                dot.style.cursor = 'pointer';
+                
+                dot.addEventListener('click', () => {
+                    currentTestimonial = i;
+                    updateTestimonial();
+                });
+                
+                sliderNav.appendChild(dot);
+            }
+            
+            document.querySelector('.testimonial-slider').appendChild(sliderNav);
+            
+            function updateTestimonial() {
+                const testimonial = testimonials[currentTestimonial];
+                
+                testimonialContainer.innerHTML = `
+                    <div class="testimonial-content">
+                        "${testimonial.content}"
+                    </div>
+                    <div class="testimonial-author">
+                        <img src="/api/placeholder/50/50" alt="User avatar">
+                        <div class="author-info">
+                            <h4>${testimonial.name}</h4>
+                            <p>${testimonial.profession}</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Update navigation dots
+                const dots = sliderNav.querySelectorAll('span');
+                dots.forEach((dot, i) => {
+                    dot.style.backgroundColor = i === currentTestimonial ? 'var(--primary)' : '#ccc';
+                });
+            }
+            
+            // Auto-rotate testimonials
+            setInterval(() => {
+                currentTestimonial = (currentTestimonial + 1) % testimonials.length;
+                updateTestimonial();
+            }, 5000);
+        }
+        
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            createGallery();
+            initializeTestimonialSlider();
+            
+            // Smooth scrolling for navigation links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+        
+        // Contact form
+        function createContactSection() {
+            const contactSection = document.createElement('section');
+            contactSection.id = 'contact';
+            contactSection.className = 'features';
+            contactSection.style.backgroundColor = 'var(--light)';
+            
+            const contactHTML = `
+                <div class="container">
+                    <h2>Contact Us</h2>
+                    <div style="max-width: 600px; margin: 0 auto;">
+                        <form id="contact-form">
+                            <div style="margin-bottom: 20px;">
+                                <label for="name" style="display: block; margin-bottom: 5px; font-weight: 500;">Name</label>
+                                <input id="name" type="text" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd;" required>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="email" style="display: block; margin-bottom: 5px; font-weight: 500;">Email</label>
+                                <input id="email" type="email" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd;" required>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="message" style="display: block; margin-bottom: 5px; font-weight: 500;">Message</label>
+                                <textarea id="message" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd; height: 150px;" required></textarea>
+                            </div>
+                            <div style="text-align: center;">
+                                <button type="submit" class="cta-button">Send Message</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            contactSection.innerHTML = contactHTML;
+            
+            // Insert contact section before footer
+            const footer = document.querySelector('footer');
+            document.body.insertBefore(contactSection, footer);
+            
+            // Add form submission handler
+            document.getElementById('contact-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('Thank you for your message! We will get back to you soon.');
+                this.reset();
+            });
+        }
+        
+        // Call contact section creation
+        window.addEventListener('DOMContentLoaded', () => {
+            createContactSection();
+        });
