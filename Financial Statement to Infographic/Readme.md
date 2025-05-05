@@ -141,10 +141,6 @@ The generated animation will include:
 - Insight slides explaining key observations
 - A comprehensive summary slide with key metrics
 
-## License
-
-[MIT License](LICENSE)
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
