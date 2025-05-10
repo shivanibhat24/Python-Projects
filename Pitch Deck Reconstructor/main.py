@@ -13,7 +13,6 @@ Dependencies:
 - torch
 - transformers
 
-Author: Claude
 Date: May 4, 2025
 """
 
