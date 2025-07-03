@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Exam Monitor Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-template-rows: 70px 1fr;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow-y: auto;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .video-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .video-feed {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .analytics-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .analytics-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-panel {
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .start-btn {
+            background: linear-gradient(45deg, #00ff88, #00cc70);
+            color: white;
+        }
+
+        .stop-btn {
+            background: linear-gradient(45deg, #ff4444, #cc3333);
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .violations-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .violation-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #ff4444;
+        }
+
+        .violation-item.warning {
+            border-left-color: #ffaa00;
+        }
+
+        .violation-item.info {
+            border-left-color: #00aaff;
+        }
+
+        .violation-time {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .violation-desc {
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 200px;
+            margin-top: 20px;
+        }
+
+        .alert-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 68, 68, 0.95);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border-left: 4px solid #ff2222;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .alert-popup.show {
+            transform: translateX(0);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #00ff88;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.7;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #00ff88;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                grid-template-rows: 70px auto 1fr;
+            }
+            
+            .analytics-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🎯 AI Exam Monitor</h1>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Offline</span>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="control-panel">
+                <h3 class="section-title">Controls</h3>
+                <button class="control-btn start-btn" id="startBtn">Start Monitoring</button>
+                <button class="control-btn stop-btn" id="stopBtn">Stop Monitoring</button>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="violationCount">0</div>
+                    <div class="stat-label">Violations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="sessionTime">00:00</div>
+                    <div class="stat-label">Session Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="alertLevel">Low</div>
+                    <div class="stat-label">Alert Level</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="confidenceScore">0%</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+            </div>
+
+            <div class="violations-section">
+                <h3 class="section-title">Recent Violations</h3>
+                <div class="violations-list" id="violationsList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        No violations detected
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <h3 class="section-title">Live Video Feed</h3>
+                <img src="/video_feed" class="video-feed" id="videoFeed" alt="Video feed will appear here">
+            </div>
+
+            <div class="analytics-section">
+                <div class="analytics-card">
+                    <h3 class="section-title">Violation Trends</h3>
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+                <div class="analytics-card">
+                    <h3 class="section-title">Activity Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert-popup" id="alertPopup">
+        <div id="alertContent"></div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Global variables
+        let isMonitoring = false;
+        let sessionStartTime = null;
+        let violations = [];
+        let trendChart = null;
+        let activityChart = null;
+
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const violationCount = document.getElementById('violationCount');
+        const sessionTime = document.getElementById('sessionTime');
+        const alertLevel = document.getElementById('alertLevel');
+        const confidenceScore = document.getElementById('confidenceScore');
+        const violationsList = document.getElementById('violationsList');
+        const alertPopup = document.getElementById('alertPopup');
+        const alertContent = document.getElementById('alertContent');
+
+        // Initialize charts
+        function initCharts() {
+            // Trend chart
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Violations per Minute',
+                        data: [],
+                        borderColor: '#ff4444',
+                        backgroundColor: 'rgba(255, 68, 68, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#fff' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#fff' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    }
+                }
+            });
+
+            // Activity chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            activityChart = new Chart(activityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Looking Away', 'Multiple Faces', 'Objects', 'Other'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: [
+                            '#ff4444',
+                            '#ffaa00',
+                            '#00aaff',
+                            '#aa44ff'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    }
+                }
+            });
+        }
+
+        // Update status
+        function updateStatus(monitoring) {
+            isMonitoring = monitoring;
+            statusDot.classList.toggle('active', monitoring);
+            statusText.textContent = monitoring ? 'Monitoring' : 'Offline';
+            
+            if (monitoring) {
+                sessionStartTime = Date.now();
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } else {
+                sessionStartTime = null;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+
+        // Update session timer
+        function updateSessionTimer() {
+            if (sessionStartTime) {
+                const elapsed = Date.now() - sessionStartTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                sessionTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Add violation to list
+        function addViolation(violation) {
+            violations.push(violation);
+            
+            const violationItem = document.createElement('div');
+            violationItem.className = 'violation-item';
+            
+            const time = new Date(violation.timestamp * 1000);
+            violationItem.innerHTML = `
+                <div class="violation-time">${time.toLocaleTimeString()}</div>
+                <div class="violation-desc">${violation.description}</div>
+                <div style="font-size: 12px; opacity: 0.7;">Confidence: ${(violation.confidence * 100).toFixed(1)}%</div>
+            `;
+            
+            violationsList.insertBefore(violationItem, violationsList.firstChild);
+            
+            // Keep only last 10 violations visible
+            while (violationsList.children.length > 10) {
+                violationsList.removeChild(violationsList.lastChild);
+            }
+            
+            // Update stats
+            violationCount.textContent = violations.length;
+            
+            // Update alert level
+            const recentViolations = violations.filter(v => 
+                Date.now() - (v.timestamp * 1000) < 60000
+            );
+            
+            if (recentViolations.length > 5) {
+                alertLevel.textContent = 'High';
+                alertLevel.style.color = '#ff4444';
+            } else if (recentViolations.length > 2) {
+                alertLevel.textContent = 'Medium';
+                alertLevel.style.color = '#ffaa00';
+            } else {
+                alertLevel.textContent = 'Low';
+                alertLevel.style.color = '#00ff88';
+            }
+            
+            // Update confidence score
+            const avgConfidence = violations.reduce((sum, v) => sum + v.confidence, 0) / violations.length;
+            confidenceScore.textContent = `${(avgConfidence * 100).toFixed(1)}%`;
+            
+            // Update charts
+            updateCharts();
+        }
+
+        // Update charts
+        function updateCharts() {
+            // Update trend chart
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString();
+            const recentViolations = violations.filter(v => 
+                Date.now() - (v.timestamp * 1000) < 60000
+            ).length;
+            
+            trendChart.data.labels.push(timeLabel);
+            trendChart.data.datasets[0].data.push(recentViolations);
+            
+            // Keep only last 10 data points
+            if (trendChart.data.labels.length > 10) {
+                trendChart.data.labels.shift();
+                trendChart.data.datasets[0].data.shift();
+            }
+            
+            trendChart.update();
+            
+            // Update activity chart
+            const activityCounts = {
+                'looking_away': 0,
+                'multiple_faces': 0,
+                'objects': 0,
+                'other': 0
+            };
+            
+            violations.forEach(v => {
+                if (v.activity === 'looking_away') {
+                    activityCounts.looking_away++;
+                } else if (v.activity === 'multiple_faces') {
+                    activityCounts.multiple_faces++;
+                } else if (v.activity.includes('detected')) {
+                    activityCounts.objects++;
+                } else {
+                    activityCounts.other++;
+                }
+            });
+            
+            activityChart.data.datasets[0].data = [
+                activityCounts.looking_away,
+                activityCounts.multiple_faces,
+                activityCounts.objects,
+                activityCounts.other
+            ];
+            
+            activityChart.update();
+        }
+
+        // Show alert popup
+        function showAlert(message) {
+            alertContent.textContent = message;
+            alertPopup.classList.add('show');
+            
+            setTimeout(() => {
+                alertPopup.classList.remove('show');
+            }, 5000);
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/start_monitoring', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    updateStatus(true);
+                    violations = [];
+                    violationsList.innerHTML = '<div class="loading">Monitoring started...</div>';
+                }
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+                showAlert('Failed to start monitoring');
+            }
+        });
+
+        stopBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/stop_monitoring', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    updateStatus(false);
+                    showAlert('Monitoring stopped');
+                }
+            } catch (error) {
+                console.error('Error stopping monitoring:', error);
+                showAlert('Failed to stop monitoring');
+            }
+        });
+
+        // Socket events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('violation_alert', (data) => {
+            addViolation(data);
+            showAlert(`Alert: ${data.description}`);
+        });
+
+        socket.on('status', (data) => {
+            console.log('Status update:', data.message);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            updateStatus(false);
+            
+            // Update timer every second
+            setInterval(updateSessionTimer, 1000);
+            
+            // Check status periodically
+            setInterval(async () => {
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    updateStatus(data.is_monitoring);
+                } catch (error) {
+                    console.error('Error checking status:', error);
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>
