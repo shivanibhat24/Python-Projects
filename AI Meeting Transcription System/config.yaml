@@ -1,0 +1,59 @@
+# Configuration for Meeting Transcription System
+
+# Audio Processing
+audio:
+  sample_rate: 16000
+  chunk_size: 1024
+  channels: 1
+  format: "WAV"
+  
+# Voice Activity Detection
+vad:
+  mode: 3  # 0: Normal, 1: Low bitrate, 2: Aggressive, 3: Very aggressive
+  frame_duration: 30  # ms
+  
+# Speaker Diarization
+diarization:
+  model_name: "pyannote/speaker-diarization-3.1"
+  min_speakers: 2
+  max_speakers: 10
+  clustering_method: "centroid"
+  
+# Speech Recognition
+speech_recognition:
+  model_name: "openai/whisper-large-v3"
+  language: "en"
+  device: "cuda"  # or "cpu"
+  batch_size: 16
+  
+# Speaker Identification
+speaker_identification:
+  model_name: "speechbrain/spkrec-ecapa-voxceleb"
+  threshold: 0.7
+  embedding_dim: 192
+  
+# NLP Processing
+nlp:
+  model_name: "en_core_web_sm"
+  sentence_segmentation: true
+  named_entity_recognition: true
+  sentiment_analysis: true
+  
+# Output
+output:
+  format: "json"  # json, txt, srt
+  include_timestamps: true
+  include_confidence: true
+  include_speaker_labels: true
+  
+# Paths
+paths:
+  input_dir: "data/input"
+  output_dir: "data/output"
+  models_dir: "models"
+  logs_dir: "logs"
+  
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
