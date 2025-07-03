@@ -1,0 +1,75 @@
+{
+  "detection_settings": {
+    "face_detection_confidence": 0.5,
+    "object_detection_confidence": 0.6,
+    "gaze_detection_confidence": 0.7,
+    "pose_detection_confidence": 0.5
+  },
+  "monitoring_thresholds": {
+    "max_faces_allowed": 1,
+    "gaze_away_threshold_seconds": 3.0,
+    "no_face_threshold_seconds": 2.0,
+    "suspicious_movement_threshold": 0.8,
+    "alert_threshold_count": 3
+  },
+  "camera_settings": {
+    "default_camera_id": 0,
+    "frame_width": 640,
+    "frame_height": 480,
+    "fps": 30,
+    "auto_exposure": true
+  },
+  "recording_settings": {
+    "enable_recording": true,
+    "output_directory": "monitoring_output",
+    "video_format": "mp4",
+    "audio_recording": false,
+    "max_file_size_mb": 500
+  },
+  "alert_settings": {
+    "enable_real_time_alerts": true,
+    "alert_sound": true,
+    "alert_popup": true,
+    "email_notifications": false,
+    "webhook_url": ""
+  },
+  "model_paths": {
+    "face_detection_model": "models/face_detection.tflite",
+    "object_detection_model": "models/object_detection.tflite",
+    "pose_estimation_model": "models/pose_estimation.tflite",
+    "custom_classifier": "models/suspicious_activity_classifier.h5"
+  },
+  "suspicious_objects": [
+    "phone",
+    "tablet",
+    "paper",
+    "book",
+    "calculator",
+    "smartwatch",
+    "earpiece",
+    "cheat_sheet"
+  ],
+  "logging": {
+    "log_level": "INFO",
+    "log_file": "exam_monitor.log",
+    "max_log_size_mb": 10,
+    "backup_count": 5
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "exam_monitor.db",
+    "backup_enabled": true
+  },
+  "ui_settings": {
+    "display_confidence_scores": true,
+    "display_bounding_boxes": true,
+    "display_violation_count": true,
+    "theme": "dark"
+  },
+  "performance": {
+    "max_threads": 4,
+    "frame_skip_rate": 1,
+    "memory_limit_mb": 2048,
+    "gpu_acceleration": false
+  }
+}
