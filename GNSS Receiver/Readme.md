@@ -40,25 +40,6 @@ pip install plotly dash  # For real-time visualization
 - **GNSS Antenna**: Active GPS/GNSS antenna
 - **Computer**: Multi-core processor recommended for real-time processing
 
-## 📦 Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/yourusername/gnss-receiver-algorithms.git
-cd gnss-receiver-algorithms
-```
-
-2. **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-3. **Install GNU Radio blocks**
-```bash
-# Add the Python path to GNU Radio
-export PYTHONPATH=$PYTHONPATH:/path/to/gnss-receiver-algorithms
-```
-
 ## 🎯 Quick Start
 
 ### Basic Usage
