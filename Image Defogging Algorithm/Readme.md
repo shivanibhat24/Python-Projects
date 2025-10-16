@@ -198,16 +198,6 @@ Based on the research paper, the proposed algorithm demonstrates:
 - Extremely thick haze may require parameter tuning
 - Processing time depends on image resolution
 
-## Project Structure
-
-```
-image-defogging/
-├── app.py                 # Main Streamlit application
-├── requirements.txt       # Python dependencies
-├── README.md             # This file
-└── sample_images/        # (Optional) Sample foggy images for testing
-```
-
 ## Performance Considerations
 
 - **Image Size:** Recommended maximum 2K resolution for optimal performance
