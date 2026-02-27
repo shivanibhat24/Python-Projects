@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHOST TRACE — Advanced OSINT Intelligence Platform</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg-void: #010409;
+  --bg-deep: #0d1117;
+  --bg-panel: #0f1621;
+  --bg-card: #131b27;
+  --bg-hover: #1a2538;
+  --border: #1e3a5f;
+  --border-glow: #0d6efd;
+  --accent-cyan: #00d4ff;
+  --accent-green: #00ff88;
+  --accent-red: #ff3366;
+  --accent-orange: #ff8c00;
+  --accent-purple: #8b5cf6;
+  --accent-yellow: #ffd700;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-dim: #484f58;
+  --critical: #ff1744;
+  --high: #ff6600;
+  --medium: #ffd600;
+  --low: #00e676;
+  --glow-cyan: 0 0 20px rgba(0,212,255,0.4);
+  --glow-red: 0 0 20px rgba(255,51,102,0.4);
+  --glow-green: 0 0 20px rgba(0,255,136,0.4);
+  --scan-line: rgba(0,212,255,0.03);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* CRT scan lines effect */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, var(--scan-line) 2px, var(--scan-line) 4px);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* Grid noise background */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────────────── */
+#header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(1,4,9,0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  padding: 0 2rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--accent-cyan);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+  animation: pulse-border 3s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { box-shadow: var(--glow-cyan); }
+  50% { box-shadow: 0 0 30px rgba(0,212,255,0.7); }
+}
+
+.logo-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.logo-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  display: block;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-text { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--text-secondary); }
+.version-tag { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); border: 1px solid var(--border); padding: 2px 8px; border-radius: 3px; }
+
+/* ─── MAIN LAYOUT ────────────────────────────────────────────────────── */
+#app { position: relative; z-index: 1; }
+
+/* ─── LANDING / SEARCH ───────────────────────────────────────────────── */
+#landing {
+  min-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  position: relative;
+}
+
+.hero-title {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-cyan) 50%, var(--accent-green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 40px rgba(0,212,255,0.3));
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 600px;
+  margin-bottom: 3rem;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+}
+
+.search-container {
+  width: 100%;
+  max-width: 680px;
+  position: relative;
+}
+
+.search-box {
+  width: 100%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.2rem 5rem 1.2rem 3.5rem;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.3s;
+  letter-spacing: 0.05em;
+}
+
+.search-box:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan), inset 0 0 30px rgba(0,212,255,0.05);
+}
+
+.search-box::placeholder { color: var(--text-dim); }
+
+.search-icon {
+  position: absolute;
+  left: 1.1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+
+.search-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, var(--accent-cyan), #0080ff);
+  border: none;
+  color: #000;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 1.2rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-btn:hover { transform: translateY(-50%) scale(1.05); box-shadow: var(--glow-cyan); }
+.search-btn:active { transform: translateY(-50%) scale(0.98); }
+
+.examples {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.example-chip {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+}
+
+.example-chip:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.05); }
+
+.capabilities {
+  margin-top: 4rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  max-width: 900px;
+  width: 100%;
+}
+
+.cap-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.2rem;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.cap-card:hover { border-color: var(--accent-cyan); transform: translateY(-3px); }
+.cap-icon { font-size: 1.8rem; margin-bottom: 0.5rem; display: block; }
+.cap-label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.05em; }
+
+/* ─── SCANNING ANIMATION ─────────────────────────────────────────────── */
+#scan-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(1,4,9,0.95);
+  z-index: 200;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+}
+
+#scan-overlay.active { display: flex; }
+
+.scan-target {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--accent-cyan);
+  letter-spacing: 0.15em;
+  margin-bottom: 0.5rem;
+}
+
+.scan-ring {
+  width: 140px; height: 140px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.scan-ring::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-cyan);
+  border-right-color: var(--accent-cyan);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.scan-ring::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: var(--accent-green);
+  animation: spin 1.5s linear infinite reverse;
+}
+
+.scan-icon-inner { font-size: 2.5rem; }
+
+.scan-log {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--accent-green);
+  max-width: 500px;
+  width: 100%;
+  text-align: left;
+  height: 160px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scan-log::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(transparent, rgba(1,4,9,0.95));
+}
+
+.log-line { margin-bottom: 0.25rem; opacity: 0; animation: fadeIn 0.3s forwards; }
+@keyframes fadeIn { to { opacity: 1; } }
+
+.scan-bar-container {
+  width: 400px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  height: 4px;
+  overflow: hidden;
+}
+
+.scan-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+  width: 0%;
+  transition: width 0.5s ease;
+  border-radius: 4px;
+  box-shadow: 0 0 10px var(--accent-cyan);
+}
+
+.scan-percent {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.8rem;
+  color: var(--accent-cyan);
+  letter-spacing: 0.1em;
+}
+
+/* ─── DASHBOARD ──────────────────────────────────────────────────────── */
+#dashboard { display: none; padding: 1.5rem 2rem 4rem; max-width: 1800px; margin: 0 auto; }
+#dashboard.active { display: block; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-title {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+}
+
+/* Subject header */
+.subject-bar {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.subject-bar::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent-cyan), var(--accent-green));
+  border-radius: 2px 0 0 2px;
+}
+
+.subject-info { flex: 1; min-width: 200px; }
+.subject-query { font-family: 'Orbitron', monospace; font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 0.3rem; }
+.subject-meta { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; color: var(--text-secondary); display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.subject-meta span { display: flex; align-items: center; gap: 0.4rem; }
+
+.subject-actions { display: flex; gap: 0.75rem; }
+.action-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+
+.action-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.05); }
+.action-btn.danger:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* Threat score panel */
+.threat-panel {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.threat-score-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.threat-ring {
+  width: 140px; height: 140px;
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.threat-ring svg { transform: rotate(-90deg); }
+.threat-ring-track { fill: none; stroke: var(--bg-card); stroke-width: 8; }
+.threat-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 376; transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+.threat-score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.threat-number { font-family: 'Orbitron', monospace; font-size: 2.4rem; font-weight: 900; line-height: 1; }
+.threat-label { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.15em; font-family: 'Share Tech Mono', monospace; }
+.threat-level-badge {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 1rem;
+  border-radius: 20px;
+  letter-spacing: 0.15em;
+}
+
+.threat-components {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem 2rem;
+}
+
+.component-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+
+.component-item {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1rem;
+  position: relative;
+}
+
+.comp-label { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.1em; margin-bottom: 0.5rem; text-transform: uppercase; font-family: 'Share Tech Mono', monospace; }
+.comp-value { font-family: 'Orbitron', monospace; font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem; }
+.comp-bar { height: 3px; background: var(--bg-panel); border-radius: 2px; overflow: hidden; }
+.comp-bar-fill { height: 100%; border-radius: 2px; transition: width 1.5s ease; }
+
+/* Main grid */
+.main-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.5rem;
+}
+
+.col-4 { grid-column: span 4; }
+.col-6 { grid-column: span 6; }
+.col-8 { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+@media (max-width: 1400px) {
+  .col-4 { grid-column: span 6; }
+  .col-8 { grid-column: span 12; }
+  .threat-panel { grid-template-columns: 200px 1fr; }
+  .component-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .col-4, .col-6, .col-8 { grid-column: span 12; }
+  .threat-panel { grid-template-columns: 1fr; }
+}
+
+/* Cards */
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.card:hover { border-color: rgba(0,212,255,0.3); }
+
+.card-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0,0,0,0.2);
+}
+
+.card-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-body { padding: 1.25rem; }
+
+/* Breach severity badges */
+.severity-badge {
+  display: inline-block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.sev-CRITICAL { background: rgba(255,23,68,0.15); color: var(--critical); border: 1px solid rgba(255,23,68,0.3); }
+.sev-HIGH { background: rgba(255,102,0,0.15); color: var(--high); border: 1px solid rgba(255,102,0,0.3); }
+.sev-MEDIUM { background: rgba(255,214,0,0.15); color: var(--medium); border: 1px solid rgba(255,214,0,0.3); }
+.sev-LOW { background: rgba(0,230,118,0.15); color: var(--low); border: 1px solid rgba(0,230,118,0.3); }
+
+/* Platform list items */
+.platform-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(30,58,95,0.5);
+  transition: all 0.2s;
+}
+
+.platform-item:last-child { border-bottom: none; }
+.platform-item:hover { background: var(--bg-hover); margin: 0 -0.5rem; padding: 0.6rem 0.5rem; border-radius: 6px; border-bottom: none; }
+
+.platform-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-active { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+.dot-possible { background: var(--accent-yellow); box-shadow: 0 0 6px var(--accent-yellow); }
+.dot-inactive { background: var(--text-dim); }
+
+.platform-name { font-size: 0.85rem; font-weight: 600; flex: 1; }
+.platform-user { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--text-dim); }
+.platform-conf { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; }
+
+/* Breach items */
+.breach-item {
+  background: var(--bg-card);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.breach-item:hover { border-color: rgba(255,102,0,0.3); }
+.breach-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+.breach-name { font-size: 0.85rem; font-weight: 600; }
+.breach-date { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); }
+.breach-fields { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.field-tag { background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); color: var(--accent-cyan); font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; padding: 0.1rem 0.4rem; border-radius: 3px; }
+
+/* Confidence bar */
+.conf-bar { height: 2px; background: var(--bg-card); border-radius: 1px; overflow: hidden; }
+.conf-fill { height: 100%; border-radius: 1px; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); }
+
+/* Network graph canvas */
+#network-canvas {
+  width: 100%;
+  height: 380px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+}
+
+#network-canvas:active { cursor: grabbing; }
+
+/* Timeline */
+.timeline-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  position: relative;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 11px;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+.timeline-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--accent-cyan);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.timeline-content { flex: 1; }
+.timeline-date { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+.timeline-event { font-size: 0.82rem; color: var(--text-primary); }
+.timeline-source { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-secondary); }
+
+/* Radar chart */
+#radar-canvas {
+  width: 200px; height: 200px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* IP cards */
+.ip-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.ip-flag { font-size: 1.5rem; flex-shrink: 0; }
+.ip-info { flex: 1; }
+.ip-addr { font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; color: var(--accent-cyan); font-weight: 700; }
+.ip-location { font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0; }
+.ip-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.ip-tag { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; padding: 0.15rem 0.5rem; border-radius: 3px; }
+.tag-vpn { background: rgba(139,92,246,0.15); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.3); }
+.tag-tor { background: rgba(255,51,102,0.15); color: var(--accent-red); border: 1px solid rgba(255,51,102,0.3); }
+.tag-cloud { background: rgba(0,212,255,0.08); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.2); }
+.tag-normal { background: rgba(0,255,136,0.08); color: var(--accent-green); border: 1px solid rgba(0,255,136,0.2); }
+
+/* Crypto wallet cards */
+.wallet-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.wallet-card:hover { border-color: rgba(247,147,26,0.4); }
+.wallet-chain { font-family: 'Orbitron', monospace; font-size: 0.7rem; color: var(--accent-yellow); letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+.wallet-addr { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--text-dim); word-break: break-all; margin-bottom: 0.5rem; }
+.wallet-balance { font-family: 'Orbitron', monospace; font-size: 1.1rem; font-weight: 700; color: #fff; }
+.wallet-usd { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--accent-green); }
+.wallet-risk-flags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+.risk-flag { background: rgba(255,23,68,0.1); color: var(--critical); border: 1px solid rgba(255,23,68,0.25); font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; padding: 0.1rem 0.4rem; border-radius: 3px; }
+
+/* Dark web items */
+.dark-mention {
+  background: rgba(255,51,102,0.05);
+  border: 1px solid rgba(255,51,102,0.2);
+  border-radius: 8px;
+  padding: 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.dark-source { font-family: 'Orbitron', monospace; font-size: 0.7rem; color: var(--accent-red); letter-spacing: 0.08em; margin-bottom: 0.3rem; }
+.dark-type { font-size: 0.8rem; color: var(--text-primary); margin-bottom: 0.25rem; }
+.dark-context { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--text-dim); font-style: italic; }
+
+/* IOC table */
+.ioc-table { width: 100%; border-collapse: collapse; }
+.ioc-table th { text-align: left; font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); text-transform: uppercase; }
+.ioc-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid rgba(30,58,95,0.3); font-size: 0.8rem; }
+.ioc-table tr:last-child td { border-bottom: none; }
+.ioc-table tr:hover td { background: var(--bg-hover); }
+.ioc-type { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--accent-cyan); }
+
+/* MITRE tactics */
+.mitre-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.mitre-tactic {
+  background: rgba(139,92,246,0.1);
+  border: 1px solid rgba(139,92,246,0.3);
+  color: var(--accent-purple);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+/* Stats numbers */
+.stat-number { font-family: 'Orbitron', monospace; font-size: 1.8rem; font-weight: 700; }
+.stat-label { font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.1em; font-family: 'Share Tech Mono', monospace; text-transform: uppercase; }
+
+/* Toast notifications */
+#toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; }
+.toast {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-cyan);
+  color: var(--text-primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 6px;
+  box-shadow: var(--glow-cyan);
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  letter-spacing: 0.05em;
+}
+
+@keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; transform: translateX(100px); } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
+
+/* Util */
+.text-cyan { color: var(--accent-cyan); }
+.text-green { color: var(--accent-green); }
+.text-red { color: var(--accent-red); }
+.text-yellow { color: var(--accent-yellow); }
+.text-dim { color: var(--text-dim); }
+.text-secondary { color: var(--text-secondary); }
+.mono { font-family: 'Share Tech Mono', monospace; }
+
+.overflow-y { overflow-y: auto; max-height: 420px; }
+.overflow-y::-webkit-scrollbar-track { background: var(--bg-card); }
+
+.new-search-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.new-search-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+/* animated gradient border */
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green), var(--accent-purple), var(--accent-cyan));
+  background-size: 300% 300%;
+  animation: gradShift 4s ease infinite;
+  z-index: -1;
+}
+
+@keyframes gradShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Report export animation */
+.export-indicator {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.tab {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+}
+
+.tab.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(0,212,255,0.08); }
+.tab:hover:not(.active) { color: var(--text-secondary); border-color: var(--border); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">
+    <div class="logo-icon">👁</div>
+    <div>
+      <div class="logo-text">GHOST TRACE</div>
+      <span class="logo-sub">ADVANCED OSINT PLATFORM v2.0</span>
+    </div>
+  </div>
+  <div class="header-status">
+    <div style="display:flex;align-items:center;gap:0.5rem">
+      <div class="status-dot"></div>
+      <span class="status-text">SYSTEMS OPERATIONAL</span>
+    </div>
+    <div class="version-tag">BUILD 2025.1</div>
+    <div class="version-tag" id="clock" style="color:var(--accent-cyan)">00:00:00 UTC</div>
+  </div>
+</div>
+
+<div id="app">
+
+<!-- LANDING -->
+<div id="landing">
+  <div class="hero-title">Hunt The Ghost</div>
+  <p class="hero-subtitle">
+    Automated OSINT intelligence gathering across surface, deep & dark web. 
+    17 correlated data sources. Real-time threat actor profiling.
+  </p>
+
+  <div class="search-container">
+    <span class="search-icon">🔍</span>
+    <input type="text" class="search-box" id="main-search" placeholder="Email / Username / Phone / IP / Domain / Crypto Wallet..." autocomplete="off">
+    <button class="search-btn" onclick="startScan()">TRACE ▶</button>
+  </div>
+
+  <div class="examples">
+    <span class="example-chip" onclick="fillSearch('john_doe@proton.me')">📧 john_doe@proton.me</span>
+    <span class="example-chip" onclick="fillSearch('0x742d35Cc6634C0532925a3b844Bc454e4438f44e')">₿ ETH Wallet</span>
+    <span class="example-chip" onclick="fillSearch('th3_r34p3r')">👤 th3_r34p3r</span>
+    <span class="example-chip" onclick="fillSearch('+91-9876543210')">📱 +91-9876543210</span>
+    <span class="example-chip" onclick="fillSearch('45.33.32.156')">🌐 IP Address</span>
+    <span class="example-chip" onclick="fillSearch('darkhunter_ind')">🎭 darkhunter_ind</span>
+  </div>
+
+  <div class="capabilities">
+    <div class="cap-card"><span class="cap-icon">🌐</span><div class="cap-label">Social Media</div></div>
+    <div class="cap-card"><span class="cap-icon">🔓</span><div class="cap-label">Breach Intel</div></div>
+    <div class="cap-card"><span class="cap-icon">🕵️</span><div class="cap-label">Dark Web</div></div>
+    <div class="cap-card"><span class="cap-icon">₿</span><div class="cap-label">Crypto Trace</div></div>
+    <div class="cap-card"><span class="cap-icon">🌍</span><div class="cap-label">Geo & IP</div></div>
+    <div class="cap-card"><span class="cap-icon">🧠</span><div class="cap-label">Behavior AI</div></div>
+    <div class="cap-card"><span class="cap-icon">🕸️</span><div class="cap-label">Network Graph</div></div>
+    <div class="cap-card"><span class="cap-icon">⚠️</span><div class="cap-label">Threat Score</div></div>
+    <div class="cap-card"><span class="cap-icon">📋</span><div class="cap-label">Paste Monitor</div></div>
+    <div class="cap-card"><span class="cap-icon">🖼️</span><div class="cap-label">Image OSINT</div></div>
+  </div>
+</div>
+
+<!-- SCAN OVERLAY -->
+<div id="scan-overlay">
+  <div class="scan-target" id="scan-query-display">TARGET: LOADING...</div>
+  <div class="scan-ring">
+    <div class="scan-icon-inner">🎯</div>
+  </div>
+  <div class="scan-log" id="scan-log"></div>
+  <div style="text-align:center">
+    <div class="scan-bar-container"><div class="scan-bar-fill" id="scan-bar"></div></div>
+    <div class="scan-percent" id="scan-percent" style="margin-top:0.5rem">0%</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- Subject Bar -->
+  <div class="subject-bar glow-border" id="subject-bar-el"></div>
+
+  <!-- Threat Score Panel -->
+  <div class="threat-panel">
+    <div class="threat-score-card">
+      <div class="threat-ring" id="threat-ring-wrapper">
+        <svg viewBox="0 0 130 130" width="140" height="140">
+          <circle class="threat-ring-track" cx="65" cy="65" r="58"/>
+          <circle class="threat-ring-fill" id="threat-ring-fill" cx="65" cy="65" r="58" stroke-dashoffset="376"/>
+        </svg>
+        <div class="threat-score-center">
+          <div class="threat-number" id="threat-number">--</div>
+          <div class="threat-label">THREAT SCORE</div>
+        </div>
+      </div>
+      <div class="threat-level-badge" id="threat-level-badge">--</div>
+    </div>
+    <div class="threat-components">
+      <div class="section-header">
+        <span class="section-title">Component Scores</span>
+        <span class="mono text-dim" style="font-size:0.7rem" id="overall-conf">Confidence: --</span>
+      </div>
+      <div class="component-grid" id="component-grid"></div>
+    </div>
+  </div>
+
+  <!-- Row 1: Social + Breaches -->
+  <div class="main-grid">
+
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title">🌐 SOCIAL MEDIA FOOTPRINT</div>
+        <div class="mono text-cyan" style="font-size:0.7rem" id="social-count">--</div>
+      </div>
+      <div class="card-body overflow-y" id="social-list"></div>
+    </div>
+
+    <div class="card col-8">
+      <div class="card-header">
+        <div class="card-title">🔓 DATA BREACH INTELLIGENCE</div>
+        <div style="display:flex;gap:0.5rem" id="breach-severity-badges"></div>
+      </div>
+      <div class="card-body overflow-y" id="breach-list"></div>
+    </div>
+
+    <!-- Network Graph -->
+    <div class="card col-8">
+      <div class="card-header">
+        <div class="card-title">🕸️ ENTITY NETWORK GRAPH</div>
+        <div class="mono text-secondary" style="font-size:0.7rem" id="graph-stats"></div>
+      </div>
+      <div class="card-body" style="padding:0.75rem">
+        <canvas id="network-canvas"></canvas>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-top:0.75rem;padding:0 0.5rem" id="legend"></div>
+      </div>
+    </div>
+
+    <!-- Radar + Behavior -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title">🧠 BEHAVIORAL ANALYSIS</div>
+      </div>
+      <div class="card-body">
+        <canvas id="radar-canvas" width="200" height="200"></canvas>
+        <div id="behavior-info" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
+    <!-- IP & Geo -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title">🌍 IP & GEOLOCATION</div>
+        <div class="mono text-secondary" style="font-size:0.7rem" id="ip-summary"></div>
+      </div>
+      <div class="card-body overflow-y" id="ip-list"></div>
+    </div>
+
+    <!-- Crypto -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title">₿ CRYPTOCURRENCY TRACING</div>
+        <div class="mono" id="crypto-total" style="font-size:0.7rem;color:var(--accent-yellow)"></div>
+      </div>
+      <div class="card-body overflow-y" id="crypto-list"></div>
+    </div>
+
+    <!-- Dark Web -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title">🕵️ DARK WEB MONITORING</div>
+        <div class="severity-badge" id="dark-web-badge">--</div>
+      </div>
+      <div class="card-body overflow-y" id="dark-list"></div>
+    </div>
+
+    <!-- Domain Intelligence -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title">🔍 DOMAIN & WHOIS INTELLIGENCE</div>
+        <div class="mono text-secondary" style="font-size:0.7rem" id="domain-count"></div>
+      </div>
+      <div class="card-body overflow-y" id="domain-list"></div>
+    </div>
+
+    <!-- Email + Phone in one card with tabs -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title">📡 CONTACT INTELLIGENCE</div>
+      </div>
+      <div class="card-body">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab(this,'tab-email')">📧 EMAIL</button>
+          <button class="tab" onclick="switchTab(this,'tab-phone')">📱 PHONE</button>
+          <button class="tab" onclick="switchTab(this,'tab-paste')">📋 PASTE SITES</button>
+          <button class="tab" onclick="switchTab(this,'tab-records')">🗂️ PUBLIC RECORDS</button>
+          <button class="tab" onclick="switchTab(this,'tab-creds')">🔑 CREDENTIALS</button>
+          <button class="tab" onclick="switchTab(this,'tab-images')">🖼️ IMAGES</button>
+        </div>
+        <div class="tab-content active" id="tab-email"></div>
+        <div class="tab-content" id="tab-phone"></div>
+        <div class="tab-content" id="tab-paste"></div>
+        <div class="tab-content" id="tab-records"></div>
+        <div class="tab-content" id="tab-creds"></div>
+        <div class="tab-content" id="tab-images"></div>
+      </div>
+    </div>
+
+    <!-- IOC Table -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title">🎯 INDICATORS OF COMPROMISE (IOC)</div>
+      </div>
+      <div class="card-body" id="ioc-section"></div>
+    </div>
+
+    <!-- MITRE + Recommendations -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title">⚔️ MITRE ATT&CK MAPPING & ACTIONS</div>
+      </div>
+      <div class="card-body" id="mitre-section"></div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card col-12">
+      <div class="card-header">
+        <div class="card-title">📅 INTELLIGENCE TIMELINE</div>
+        <button class="new-search-btn" onclick="resetToLanding()">↩ NEW SEARCH</button>
+      </div>
+      <div class="card-body" id="timeline-section" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- end #app -->
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// OSINT ENGINE (Pure JS - mirrors Python logic)
+// ────────────────────────────────────────────────────────────────────────────
+
+class SeededRandom {
+  constructor(seed) {
+    this.seed = BigInt(seed) % BigInt(2147483647);
+    if (this.seed <= 0n) this.seed += BigInt(2147483646);
+  }
+  next() {
+    this.seed = (this.seed * 16807n) % BigInt(2147483647);
+    return Number(this.seed) / 2147483647;
+  }
+  randint(min, max) { return Math.floor(this.next() * (max - min + 1)) + min; }
+  choice(arr) { return arr[Math.floor(this.next() * arr.length)]; }
+  sample(arr, n) {
+    const a = [...arr]; const r = [];
+    for (let i = 0; i < Math.min(n, a.length); i++) {
+      const idx = Math.floor(this.next() * (a.length - i));
+      r.push(a.splice(idx, 1)[0]);
+    }
+    return r;
+  }
+  uniform(min, max) { return this.next() * (max - min) + min; }
+}
+
+function md5seed(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) + 1;
+}
+
+function sha256short(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash) + str.charCodeAt(i);
+  return (Math.abs(hash) >>> 0).toString(16).padStart(8,'0').repeat(2);
+}
+
+function randomDate(rng, y1, y2) {
+  const start = new Date(y1, 0, 1), end = new Date(y2, 11, 31);
+  const d = new Date(start.getTime() + rng.next() * (end.getTime() - start.getTime()));
+  return d.toISOString().split('T')[0];
+}
+
+function classifyInput(q) {
+  q = q.trim();
+  if (/^[\w.+-]+@[\w-]+\.[a-z]{2,}$/i.test(q)) return {type:'email', value:q};
+  if (/^0x[a-fA-F0-9]{40}$/.test(q)) return {type:'ethereum', value:q};
+  if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(q)) return {type:'bitcoin', value:q};
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(q)) return {type:'ip_address', value:q};
+  if (/^[a-z0-9-]+\.[a-z]{2,}$/i.test(q)) return {type:'domain', value:q};
+  if (/^[+\d\s\-().]{7,20}$/.test(q)) return {type:'phone', value:q};
+  return {type:'username', value:q};
+}
+
+function generateUserVariants(q) {
+  const base = q.toLowerCase().split('@')[0].replace(/[^a-z0-9]/g,'');
+  return [base, base+'123', '_'+base+'_', base+'_sec', 'real_'+base, base+'0x', 'the'+base, base.split('').reverse().join(''), base+'hax'];
+}
+
+function generateBio(rng, q) {
+  const t = ["Security researcher | Bug bounty hunter | CTF player","Full-stack dev | Open source enthusiast","💻 Code | 🔐 Sec | 🌐 Web3","Red teamer | Pentester","Silence is golden. Encryption is platinum.","🚀 Building | Breaking | Fixing"];
+  return rng.choice(t);
+}
+
+function generateName(rng) {
+  const f=["Rahul","Priya","Amit","Sneha","Vikram","Anjali","Rohit","Deepa","Suresh","Kavya"];
+  const l=["Sharma","Patel","Kumar","Singh","Verma","Gupta","Joshi","Nair","Reddy","Shah"];
+  return rng.choice(f)+' '+rng.choice(l);
+}
+
+function topicPool() {
+  return ["cybersecurity","ctf","programming","crypto","gaming","linux","hacking","dark_web","privacy","opsec","ai","malware","reversing","bug_bounty","web3"];
+}
+
+function buildProfile(query) {
+  const input = classifyInput(query);
+  const type = input.type;
+
+  const scanSocial = () => {
+    const platforms = [
+      ["Twitter/X","twitter.com",0.91,"Active"],["Reddit","reddit.com",0.87,"Active"],
+      ["GitHub","github.com",0.83,"Active"],["LinkedIn","linkedin.com",0.72,"Possible"],
+      ["Instagram","instagram.com",0.68,"Active"],["Facebook","facebook.com",0.55,"Inactive"],
+      ["TikTok","tiktok.com",0.49,"Possible"],["Telegram","t.me",0.78,"Active"],
+      ["Discord","discord.com",0.82,"Active"],["Mastodon","mastodon.social",0.41,"Inactive"],
+      ["Pastebin","pastebin.com",0.66,"Active"],["Medium","medium.com",0.58,"Possible"],
+      ["HackerNews","news.ycombinator.com",0.71,"Active"],["Stack Overflow","stackoverflow.com",0.69,"Active"],
+      ["GitLab","gitlab.com",0.62,"Active"],["Keybase","keybase.io",0.55,"Possible"],
+      ["Telegram Groups","t.me/groups",0.73,"Active"],["Dark Forums","darkforum.onion",0.38,"Possible"],
+      ["Signal","signal.org",0.35,"Unverified"],["ProtonMail","proton.me",0.43,"Unverified"],
+    ];
+    const rng = new SeededRandom(md5seed(query));
+    const found = [];
+    for (const [name,domain,baseConf,status] of platforms) {
+      const conf = Math.max(0.1, Math.min(0.99, baseConf + rng.uniform(-0.15, 0.15)));
+      if (rng.next() < conf) {
+        const un = rng.choice(generateUserVariants(query));
+        found.push({
+          platform: name, url: `https://${domain}/${un}`, username: un,
+          confidence: Math.round(conf*100)/100, status,
+          posts: rng.randint(5,4800), followers: rng.randint(10,95000),
+          last_active: randomDate(rng, 2019, 2024),
+          verified: rng.next() < 0.15,
+          bio: generateBio(rng, query),
+          interests: rng.sample(topicPool(), rng.randint(2,5)),
+        });
+      }
+    }
+    return { found: found.length, total: platforms.length, profiles: found };
+  };
+
+  const scanBreaches = () => {
+    const db = [
+      ["LinkedIn 2021","2021-06-22",700000000,"HIGH",["email","name","phone","job"]],
+      ["RockYou2021","2021-06-05",8459060239,"CRITICAL",["password","email"]],
+      ["Facebook 2019","2019-04-03",533000000,"HIGH",["phone","email","name","location"]],
+      ["Adobe 2013","2013-10-04",152000000,"MEDIUM",["email","password_hash","username"]],
+      ["Yahoo 2016","2016-09-22",500000000,"CRITICAL",["email","password_hash","dob","security_q"]],
+      ["Dropbox 2012","2012-07-01",68680741,"MEDIUM",["email","password_hash"]],
+      ["MyFitnessPal 2018","2018-03-29",150000000,"HIGH",["email","username","password_hash"]],
+      ["Zynga 2019","2019-09-01",172869660,"HIGH",["email","username","password_hash","phone"]],
+      ["Twitch 2021","2021-10-06",125000000,"HIGH",["email","username","source_code"]],
+      ["Collection #1-5","2019-01-17",2692818238,"CRITICAL",["email","password"]],
+      ["Gravatar 2020","2020-10-03",114000000,"LOW",["email","username","hash"]],
+      ["MobiKwik 2021","2021-04-01",100000000,"HIGH",["email","phone","kyc","address"]],
+      ["BigBasket 2020","2020-11-01",20000000,"HIGH",["email","phone","address","dob"]],
+      ["Juspay 2020","2020-12-23",35000000,"HIGH",["email","card_hash","phone"]],
+      ["Wattpad 2020","2020-06-29",268745495,"HIGH",["email","username","ip","password_hash"]],
+      ["Canva 2019","2019-05-24",137272116,"MEDIUM",["email","name","username"]],
+      ["HaveiBeenPwned","2023-01-01",12000000000,"CRITICAL",["email","password"]],
+    ];
+    const rng = new SeededRandom(md5seed('breach'+query));
+    const found = [];
+    const sevMap = {CRITICAL:0.7,HIGH:0.55,MEDIUM:0.4,LOW:0.25};
+    for (const [name,date,count,sev,fields] of db) {
+      if (rng.next() < sevMap[sev]) {
+        const expFields = rng.sample(fields, rng.randint(2, fields.length));
+        found.push({
+          breach:name, date, total_records:count, severity:sev,
+          exposed_fields:expFields,
+          password_exposed: expFields.includes('password') && rng.next()<0.3,
+          confidence: Math.round(rng.uniform(0.7,0.98)*100)/100,
+        });
+      }
+    }
+    const sevCount = {};
+    for (const b of found) sevCount[b.severity] = (sevCount[b.severity]||0)+1;
+    const riskScore = Math.min(100, found.reduce((acc,b)=>acc+({CRITICAL:35,HIGH:20,MEDIUM:10,LOW:5}[b.severity]||0),0));
+    return { found: found.length, total: db.length, breaches: found, severity_count: sevCount, risk_score: riskScore };
+  };
+
+  const scanDarkWeb = () => {
+    const rng = new SeededRandom(md5seed('dark'+query));
+    const forums = [
+      ["BreachForums","breachforums.cx","ACTIVE"],["RaidForums (archived)","raidforums.com","SEIZED"],
+      ["XSS.is","xss.is","ACTIVE"],["Exploit.in","exploit.in","ACTIVE"],
+      ["Dread (Tor)","dread.onion","ACTIVE"],["Dark0de Reborn","dark0de.co","ACTIVE"],
+      ["Russian Market","russiamarket.io","ACTIVE"],["Telegram Dark","t.me/dark","ACTIVE"],
+      ["Genesis Market","genesismarket.cc","SEIZED"],
+    ];
+    const mentions = [];
+    for (const [forum, url, status] of forums) {
+      if (rng.next() < 0.35) {
+        mentions.push({
+          source: forum, url, status,
+          mention_type: rng.choice(["credential_sale","identity_mention","data_dump","discussion","doxing_thread"]),
+          date: randomDate(rng,2020,2024),
+          confidence: Math.round(rng.uniform(0.45,0.90)*100)/100,
+          context: `...${query.substring(0,12)}... [REDACTED — dark web mention detected]`,
+          threat_level: rng.choice(["LOW","MEDIUM","HIGH","CRITICAL"]),
+        });
+      }
+    }
+    const threat = mentions.length > 3 ? "HIGH" : mentions.length > 0 ? "MEDIUM" : "LOW";
+    return { forums: forums.length, mentions_found: mentions.length, mentions, dark_web_threat: threat };
+  };
+
+  const scanCrypto = () => {
+    const rng = new SeededRandom(md5seed('crypto'+query));
+    const chains = [["Bitcoin","BTC","1",0.4],["Ethereum","ETH","0x",0.5],["Monero","XMR","4",0.3],["Tron","TRX","T",0.25],["Litecoin","LTC","L",0.2],["Zcash","ZEC","z",0.15]];
+    const wallets = [];
+    for (const [chain,sym,prefix,prob] of chains) {
+      if (rng.next() < prob) {
+        const h = sha256short(query+chain);
+        const balance = Math.round(rng.uniform(0.001,12.5)*1e6)/1e6;
+        const riskFlags = [];
+        if (rng.next()<0.25) riskFlags.push("mixer_usage");
+        if (rng.next()<0.2) riskFlags.push("darknet_market_interaction");
+        if (rng.next()<0.15) riskFlags.push("sanctioned_entity");
+        if (rng.next()<0.1) riskFlags.push("ransomware_wallet");
+        const usdRate = sym==="BTC" ? rng.uniform(30000,65000) : rng.uniform(1500,4000);
+        wallets.push({
+          chain, symbol:sym, address:`${prefix}${h.substring(0,28)}`,
+          balance, balance_usd: Math.round(balance*usdRate*100)/100,
+          transactions: rng.randint(3,450),
+          risk_flags: riskFlags, risk_score: riskFlags.length*25,
+          first_seen: randomDate(rng,2018,2022),
+          last_active: randomDate(rng,2023,2024),
+          connected_exchanges: rng.sample(["Binance","Coinbase","KuCoin","OKX","Bybit","LocalBitcoins"], rng.randint(1,3)),
+        });
+      }
+    }
+    const total_usd = wallets.reduce((a,w)=>a+w.balance_usd,0);
+    return { wallets_found: wallets.length, total_usd: Math.round(total_usd*100)/100, wallets, high_risk: wallets.filter(w=>w.risk_score>50).length };
+  };
+
+  const scanIP = () => {
+    const rng = new SeededRandom(md5seed('ipgeo'+query));
+    const ips = [];
+    for (let i = 0; i < rng.randint(2,6); i++) {
+      const oct1 = rng.choice([49,103,116,157,202,45,103]);
+      const ip = `${oct1}.${rng.randint(1,254)}.${rng.randint(1,254)}.${rng.randint(1,254)}`;
+      const country = rng.choice(["India","Russia","USA","Netherlands","Germany","Singapore","Ukraine","Romania","China","Brazil"]);
+      const cityMap = {India:["Mumbai","Delhi","Bengaluru","Hyderabad"],Russia:["Moscow","St. Petersburg"],USA:["New York","Los Angeles","Chicago"],Netherlands:["Amsterdam"],Germany:["Berlin","Frankfurt"],Singapore:["Singapore"],Ukraine:["Kyiv","Kharkiv"],Romania:["Bucharest"],China:["Shanghai","Beijing"],Brazil:["São Paulo"]};
+      const city = rng.choice(cityMap[country]||["Unknown"]);
+      const isp = rng.choice(["Cloudflare","AWS","Google Cloud","DigitalOcean","Hetzner","BSNL","Jio","Airtel"]);
+      const is_vpn = rng.next()<0.4, is_tor=rng.next()<0.15, is_proxy=rng.next()<0.3;
+      const is_cloud = ["AWS","Google Cloud","Cloudflare","DigitalOcean","Hetzner"].some(x=>isp.includes(x));
+      const threat_score = Math.min(100,(is_tor?50:0)+(is_vpn?30:0)+(is_proxy?20:0)+rng.randint(0,20));
+      ips.push({ ip, country, city, isp, asn:`AS${rng.randint(10000,99999)}`, is_vpn, is_tor, is_proxy, is_cloud, threat_score, abuse_reports: rng.randint(0,142), last_seen: randomDate(rng,2022,2024) });
+    }
+    return { ips_found: ips.length, unique_countries: new Set(ips.map(i=>i.country)).size, vpn_count: ips.filter(i=>i.is_vpn).length, tor_count: ips.filter(i=>i.is_tor).length, ips };
+  };
+
+  const scanEmail = () => {
+    const rng = new SeededRandom(md5seed('email'+query));
+    const email = type==='email' ? query : `${query.toLowerCase().replace(/[^a-z0-9]/g,'.')}@gmail.com`;
+    const [local,,domain] = email.includes('@') ? email.split('@') : [email,'','gmail.com'];
+    const disposable_flags = ["mailinator","tempmail","guerrilla","10minutemail"];
+    const is_disposable = disposable_flags.some(f=>domain.includes(f));
+    const age_days = rng.randint(180,4200);
+    const created = new Date(Date.now()-age_days*86400000).toISOString().split('T')[0];
+    const alts = [];
+    for (let i=0;i<rng.randint(1,5);i++) alts.push(`${local}${rng.choice(['','123','_sec',''])}@${rng.choice(["gmail.com","yahoo.com","proton.me","outlook.com","tutanota.com"])}`);
+    return { email, domain: domain||'gmail.com', valid:true, deliverable:rng.next()<0.85, disposable:is_disposable, age_days, created, spf:rng.next()<0.7, dkim:rng.next()<0.65, dmarc:rng.next()<0.6, reputation:rng.randint(35,98), spam_reports:rng.randint(0,25), associated_emails:alts, google_account:rng.next()<0.7, gravatar:rng.next()<0.45 };
+  };
+
+  const scanDomains = () => {
+    const rng = new SeededRandom(md5seed('domain'+query));
+    const tlds = [".com",".net",".org",".io",".co",".in",".xyz",".tech",".dev",".me"];
+    const base = query.toLowerCase().split('@')[0].replace(/[^a-z0-9]/g,'').substring(0,12);
+    const found = [];
+    for (const tld of tlds) {
+      if (rng.next()<0.5) {
+        const age = rng.randint(30,4000);
+        found.push({
+          domain: base+tld, registered:true,
+          registrar: rng.choice(["GoDaddy","Namecheap","Google Domains","Cloudflare","BigRock"]),
+          created: new Date(Date.now()-age*86400000).toISOString().split('T')[0],
+          privacy_protected: rng.next()<0.6,
+          ssl_valid: rng.next()<0.8,
+          technologies: rng.sample(["WordPress","Nginx","Apache","React","PHP","Django","Cloudflare"], rng.randint(2,4)),
+          subdomains: rng.sample(["admin","mail","dev","api","login","panel","secure","vpn"], rng.randint(1,4)).map(s=>s+'.'+base+tld),
+        });
+      }
+    }
+    return { domains_found: found.length, domains: found };
+  };
+
+  const scanPhone = () => {
+    const rng = new SeededRandom(md5seed('phone'+query));
+    const phone = type==='phone' ? query : `+91${rng.randint(7000000000,9999999999)}`;
+    const carrier = rng.choice(["Jio","Airtel","BSNL","Vi","T-Mobile","Verizon"]);
+    const apps = [];
+    for (const app of ["WhatsApp","Telegram","Signal","Truecaller","Instagram","Paytm"]) {
+      if (rng.next()<0.6) apps.push({ app, profile_name:generateName(rng), last_seen:randomDate(rng,2023,2024), status:rng.choice(["Active","Inactive","Hidden"]) });
+    }
+    return { phone, carrier, line_type:rng.choice(["Mobile","VoIP","Landline"]), spam_score:rng.randint(0,85), truecaller_name:rng.next()<0.7?generateName(rng):null, apps_linked:apps };
+  };
+
+  const scanPastes = () => {
+    const rng = new SeededRandom(md5seed('paste'+query));
+    const sites = ["Pastebin","Ghostbin","Hastebin","Rentry","JustPasteIt","PrivateBin","Paste2"];
+    const pastes = [];
+    for (const site of sites) {
+      if (rng.next()<0.3) {
+        const key = sha256short(query+site).substring(0,8);
+        pastes.push({ site, url:`https://${site.toLowerCase()}.com/${key}`, title:rng.choice(["credentials_dump","email_list","untitled","config","log_file"]), date:randomDate(rng,2019,2024), lines:rng.randint(10,50000), contains_pii:rng.next()<0.6, confidence:Math.round(rng.uniform(0.5,0.95)*100)/100 });
+      }
+    }
+    return { sites_checked: sites.length, pastes_found: pastes.length, pastes };
+  };
+
+  const scanImages = () => {
+    const rng = new SeededRandom(md5seed('img'+query));
+    const imgs = [];
+    for (let i=0;i<rng.randint(2,8);i++) {
+      imgs.push({ source:rng.choice(["Twitter","Instagram","LinkedIn","Google Images","Pinterest"]), face_detected:rng.next()<0.6, camera:rng.choice(["iPhone 14","Pixel 7","Samsung S23","Canon EOS R6",null]), gps_embedded:rng.next()<0.2, reverse_search_hits:rng.randint(0,45) });
+    }
+    return { images_found: imgs.length, images: imgs };
+  };
+
+  const scanRecords = () => {
+    const rng = new SeededRandom(md5seed('pub'+query));
+    const sources = ["Voter Registry","Property Records","Court Records","Company Registry","NGO Filing","Patent Database","Academic Registry"];
+    const records = rng.sample(sources, rng.randint(2,5)).map(s=>({ source:s, match:rng.next()<0.5, jurisdiction:rng.choice(["Maharashtra, IN","Delhi, IN","California, US","UK","Germany"]), date:randomDate(rng,2010,2023), confidence:Math.round(rng.uniform(0.4,0.9)*100)/100 }));
+    return { hits: records.filter(r=>r.match).length, records };
+  };
+
+  const scanCreds = () => {
+    const rng = new SeededRandom(md5seed('cred'+query));
+    const creds = [];
+    for (let i=0;i<rng.randint(0,6);i++) {
+      creds.push({ source:rng.choice(["Combo List","Stealer Log","Credential DB","Forum Dump"]), email:type==='email'?query:`${query}@${rng.choice(['gmail.com','yahoo.com','hotmail.com'])}`, plaintext_risk:rng.next()<0.3, date_found:randomDate(rng,2020,2024), password_hash:rng.next()<0.5?sha256short(query+i).substring(0,32):null });
+    }
+    return { found: creds.length, credentials: creds };
+  };
+
+  const analyzeBehavior = () => {
+    const rng = new SeededRandom(md5seed('behav'+query));
+    const tz = rng.choice([-8,-5,0,3,5.5,8,9]);
+    const tzNames = {'-8':'PST (USA)','-5':'EST (USA)','0':'UTC (UK)','3':'MSK (Russia)','5.5':'IST (India)','8':'CST (China)','9':'JST (Japan)'};
+    const traits = { technical_skill:rng.randint(40,98), opsec_awareness:rng.randint(20,95), threat_level:rng.randint(20,90), language_proficiency:rng.randint(50,100), social_engineering:rng.randint(10,85) };
+    const devices = rng.sample(["Windows 10/11","Kali Linux","Tails OS","macOS","Android","iOS","Ubuntu"], rng.randint(1,4));
+    const languages = rng.sample(["English","Russian","Hindi","Mandarin","Arabic","Spanish"], rng.randint(1,3));
+    const threat_actor = rng.choice(["Script Kiddie","Opportunistic Attacker","Advanced Persistent Threat","Insider Threat","Hacktivist","Financially Motivated"]);
+    const peak_hour = rng.randint(0,23);
+    return { timezone: tzNames[String(tz)]||"Unknown", tz_offset:tz, peak_hour, activity:rng.choice(["Nocturnal","Diurnal","Irregular","Burst-based"]), languages, devices, traits, persona_count:rng.randint(1,6), threat_actor };
+  };
+
+  const buildNetworkGraph = (data) => {
+    const rng = new SeededRandom(md5seed('net'+query));
+    const nodes = [{id:'target',label:query,type:'target',size:20,color:'#ff4444',x:0,y:0}];
+    const edges = [];
+    let angle = 0;
+    const step = (2*Math.PI)/Math.max(1,(data.social.profiles.length+data.breaches.breaches.length+data.crypto.wallets.length+data.ip.ips.length));
+
+    const addNode = (id,label,type,color,size,from,weight) => {
+      const r = 120+rng.uniform(-20,20);
+      const a = angle; angle+=step;
+      nodes.push({id,label,type,color,size,x:r*Math.cos(a),y:r*Math.sin(a)});
+      edges.push({from,to:id,weight,type});
+    };
+
+    for (const p of data.social.profiles.slice(0,8)) addNode('sm_'+p.platform,p.platform,'social','#4488ff',10,'target',p.confidence);
+    for (const b of data.breaches.breaches.slice(0,5)) {
+      const c={'CRITICAL':'#ff1744','HIGH':'#ff6600','MEDIUM':'#ffd600','LOW':'#00e676'}[b.severity];
+      addNode('br_'+b.breach,b.breach.substring(0,12),'breach',c,8,'target',b.confidence);
+    }
+    for (const w of data.crypto.wallets.slice(0,4)) addNode('w_'+w.symbol,w.symbol+' Wallet','crypto',w.symbol==='BTC'?'#f7931a':'#627eea',9,'target',0.8);
+    for (const ip of data.ip.ips.slice(0,4)) {
+      const c=ip.is_tor?'#ff6699':ip.is_vpn?'#aa66ff':'#66ccff';
+      addNode('ip_'+ip.ip,ip.ip,'ip',c,7,'target',0.7);
+    }
+    return { nodes, edges };
+  };
+
+  const calculateThreatScore = (data) => {
+    const components = {
+      breach_risk: data.breaches.risk_score,
+      dark_web: data.darkweb.dark_web_threat==='HIGH'?75:data.darkweb.mentions_found>0?40:10,
+      crypto_risk: Math.min(100,data.crypto.high_risk*20),
+      social_footprint: Math.min(100,data.social.found*3),
+      ip_threat: Math.max(...data.ip.ips.map(i=>i.threat_score),0),
+      behavioral: data.behavior.traits.threat_level,
+    };
+    const weights = {breach_risk:0.25,dark_web:0.25,crypto_risk:0.15,social_footprint:0.10,ip_threat:0.15,behavioral:0.10};
+    const total = Object.keys(components).reduce((acc,k)=>acc+Math.min(100,components[k])*weights[k],0);
+    const score = Math.round(total*10)/10;
+    const level = score>=80?'CRITICAL':score>=60?'HIGH':score>=40?'MEDIUM':'LOW';
+    const rng = new SeededRandom(md5seed('threat'+query));
+    const mitre = rng.sample(["Reconnaissance","Resource Development","Initial Access","Execution","Persistence","Privilege Escalation","Defense Evasion","Credential Access","Discovery","Lateral Movement","Collection","Exfiltration"],rng.randint(3,7));
+    const iocs = { email_addresses:rng.randint(2,8), ip_addresses:rng.randint(3,12), domains:rng.randint(1,6), crypto_addresses:rng.randint(0,5), hashes:rng.randint(0,15), usernames:rng.randint(3,10) };
+    return { score, level, components, confidence: Math.round(rng.uniform(0.72,0.94)*100)/100, mitre, iocs };
+  };
+
+  // Build all
+  const social = scanSocial();
+  const breaches = scanBreaches();
+  const darkweb = scanDarkWeb();
+  const crypto = scanCrypto();
+  const ip = scanIP();
+  const email = scanEmail();
+  const domains = scanDomains();
+  const phone = scanPhone();
+  const pastes = scanPastes();
+  const images = scanImages();
+  const records = scanRecords();
+  const creds = scanCreds();
+  const behavior = analyzeBehavior();
+  const network = buildNetworkGraph({social,breaches,crypto,ip});
+  const threat = calculateThreatScore({breaches,darkweb,crypto,social,ip,behavior});
+
+  return { input, query, social, breaches, darkweb, crypto, ip, email, domains, phone, pastes, images, records, creds, behavior, network, threat };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// UI LOGIC
+// ────────────────────────────────────────────────────────────────────────────
+
+let currentProfile = null;
+
+function fillSearch(val) {
+  document.getElementById('main-search').value = val;
+  document.getElementById('main-search').focus();
+}
+
+document.getElementById('main-search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startScan();
+});
+
+async function startScan() {
+  const query = document.getElementById('main-search').value.trim();
+  if (!query) { showToast('⚠ Please enter a target identifier'); return; }
+
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('dashboard').classList.remove('active');
+  const overlay = document.getElementById('scan-overlay');
+  overlay.classList.add('active');
+  document.getElementById('scan-query-display').textContent = `TARGET: ${query.toUpperCase()}`;
+
+  const logEl = document.getElementById('scan-log');
+  const barEl = document.getElementById('scan-bar');
+  const pctEl = document.getElementById('scan-percent');
+  logEl.innerHTML = '';
+
+  const logMessages = [
+    '[INIT] Ghost Trace Engine v2.0 initialized...',
+    '[DNS] Resolving target identifiers...',
+    '[SOCIAL] Querying 20 social media platforms...',
+    '[BREACH] Cross-referencing 17 breach databases...',
+    '[DARKWEB] Scanning Tor hidden services & forums...',
+    '[CRYPTO] Tracing blockchain transaction history...',
+    '[IP/GEO] Geolocating IP addresses and ASNs...',
+    '[EMAIL] Validating email metadata and reputation...',
+    '[DOMAIN] WHOIS lookup and DNS enumeration...',
+    '[PHONE] Carrier lookup and app association...',
+    '[PASTE] Monitoring paste sites and data dumps...',
+    '[IMAGE] Reverse image search and EXIF extraction...',
+    '[RECORDS] Querying public record databases...',
+    '[CREDS] Checking credential intelligence feeds...',
+    '[BEHAVIOR] Analyzing temporal and linguistic patterns...',
+    '[CLUSTER] Building identity correlation graph...',
+    '[GRAPH] Generating network visualization...',
+    '[THREAT] Calculating composite threat score...',
+    '[MITRE] Mapping to ATT&CK framework...',
+    '[DONE] Profile compilation complete.',
+  ];
+
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < logMessages.length) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = logMessages[i];
+      line.style.color = i === logMessages.length-1 ? 'var(--accent-cyan)' : 'var(--accent-green)';
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      const pct = Math.round((i+1)/logMessages.length*100);
+      barEl.style.width = pct+'%';
+      pctEl.textContent = pct+'%';
+      i++;
+    } else {
+      clearInterval(interval);
+      setTimeout(() => {
+        const profile = buildProfile(query);
+        currentProfile = profile;
+        overlay.classList.remove('active');
+        renderDashboard(profile);
+        document.getElementById('dashboard').classList.add('active');
+        showToast('✅ Profile generated — 17 modules executed');
+      }, 400);
+    }
+  }, 90);
+}
+
+function resetToLanding() {
+  document.getElementById('dashboard').classList.remove('active');
+  document.getElementById('landing').style.display = '';
+  document.getElementById('main-search').value = '';
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+
+function switchTab(btn, contentId) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(contentId).classList.add('active');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RENDERERS
+// ────────────────────────────────────────────────────────────────────────────
+
+function renderDashboard(p) {
+  renderSubjectBar(p);
+  renderThreatScore(p.threat);
+  renderSocial(p.social);
+  renderBreaches(p.breaches);
+  renderIP(p.ip);
+  renderCrypto(p.crypto);
+  renderDarkWeb(p.darkweb);
+  renderDomains(p.domains);
+  renderEmail(p.email);
+  renderPhone(p.phone);
+  renderPastes(p.pastes);
+  renderImages(p.images);
+  renderRecords(p.records);
+  renderCreds(p.creds);
+  renderBehavior(p.behavior);
+  renderNetworkGraph(p.network);
+  renderIOC(p.threat);
+  renderMitre(p.threat);
+  renderTimeline(p);
+}
+
+function renderSubjectBar(p) {
+  const typeIcons = {email:'📧',username:'👤',phone:'📱',ip_address:'🌐',domain:'🔗',ethereum:'⟠',bitcoin:'₿'};
+  const icon = typeIcons[p.input.type] || '🔍';
+  const threatColors = {CRITICAL:'var(--critical)',HIGH:'var(--high)',MEDIUM:'var(--medium)',LOW:'var(--low)'};
+  const threatColor = threatColors[p.threat.level];
+  document.getElementById('subject-bar-el').innerHTML = `
+    <div class="subject-info">
+      <div class="subject-query">${icon} ${p.query}</div>
+      <div class="subject-meta">
+        <span>🏷 TYPE: ${p.input.type.replace('_',' ').toUpperCase()}</span>
+        <span>🧩 MODULES: 17</span>
+        <span>📊 SOURCES: 150+</span>
+        <span>🕐 ${new Date().toUTCString()}</span>
+      </div>
+    </div>
+    <div class="subject-actions">
+      <button class="action-btn" onclick="exportJSON()">⬇ JSON</button>
+      <button class="action-btn" onclick="exportReport()">📄 REPORT</button>
+      <button class="action-btn" onclick="showToast('🔗 IOC feed copied to clipboard')">📋 IOCs</button>
+      <button class="action-btn danger" onclick="showToast('🗑 Investigation cleared')">🗑 CLEAR</button>
+    </div>`;
+}
+
+function renderThreatScore(threat) {
+  const colors = {CRITICAL:'#ff1744',HIGH:'#ff6600',MEDIUM:'#ffd600',LOW:'#00e676'};
+  const color = colors[threat.level];
+  const dashoffset = 376 - (376 * threat.score / 100);
+
+  const fill = document.getElementById('threat-ring-fill');
+  fill.setAttribute('stroke', color);
+  setTimeout(() => fill.setAttribute('stroke-dashoffset', dashoffset), 100);
+
+  document.getElementById('threat-number').textContent = threat.score;
+  document.getElementById('threat-number').style.color = color;
+
+  const badge = document.getElementById('threat-level-badge');
+  badge.textContent = threat.level;
+  badge.className = `threat-level-badge sev-${threat.level}`;
+  badge.style.color = color;
+  badge.style.borderColor = color;
+  badge.style.background = color+'22';
+
+  document.getElementById('overall-conf').textContent = `Confidence: ${Math.round(threat.confidence*100)}%`;
+
+  const compLabels = {breach_risk:'Breach Risk',dark_web:'Dark Web',crypto_risk:'Crypto Risk',social_footprint:'Social Footprint',ip_threat:'IP Threat',behavioral:'Behavioral'};
+  const compColors = {breach_risk:'#ff6600',dark_web:'#ff1744',crypto_risk:'#f7931a',social_footprint:'#4488ff',ip_threat:'#aa66ff',behavioral:'#00e676'};
+  document.getElementById('component-grid').innerHTML = Object.entries(threat.components).map(([k,v])=>`
+    <div class="component-item">
+      <div class="comp-label">${compLabels[k]}</div>
+      <div class="comp-value" style="color:${compColors[k]}">${Math.round(v)}</div>
+      <div class="comp-bar"><div class="comp-bar-fill" style="background:${compColors[k]};width:${Math.min(100,v)}%"></div></div>
+    </div>`).join('');
+}
+
+function renderSocial(social) {
+  document.getElementById('social-count').textContent = `${social.found}/${social.total} found`;
+  const dotClass = {Active:'dot-active',Possible:'dot-possible',Inactive:'dot-inactive',Unverified:'dot-inactive'};
+  document.getElementById('social-list').innerHTML = social.profiles.map(p=>`
+    <div class="platform-item">
+      <div class="platform-dot ${dotClass[p.status]||'dot-inactive'}"></div>
+      <div style="flex:1">
+        <div class="platform-name">${p.platform} ${p.verified?'✔':''}</div>
+        <div class="platform-user">@${p.username} · ${p.followers.toLocaleString()} followers · ${p.last_active}</div>
+      </div>
+      <div class="platform-conf text-cyan">${Math.round(p.confidence*100)}%</div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No profiles found</div>';
+}
+
+function renderBreaches(breaches) {
+  const sevCount = breaches.severity_count || {};
+  document.getElementById('breach-severity-badges').innerHTML = Object.entries(sevCount).map(([s,c])=>`<span class="severity-badge sev-${s}">${s} ×${c}</span>`).join('');
+  document.getElementById('breach-list').innerHTML = breaches.breaches.map(b=>`
+    <div class="breach-item">
+      <div class="breach-header">
+        <span class="breach-name">${b.breach}</span>
+        <span class="severity-badge sev-${b.severity}">${b.severity}</span>
+      </div>
+      <div class="breach-date mono text-dim" style="font-size:0.68rem;margin-bottom:0.4rem">${b.date} · ${(b.total_records/1e6).toFixed(1)}M records · Conf: ${Math.round(b.confidence*100)}%</div>
+      <div class="breach-fields">${b.exposed_fields.map(f=>`<span class="field-tag">${f}</span>`).join('')}${b.password_exposed?'<span class="field-tag" style="border-color:var(--accent-red);color:var(--accent-red)">⚠ PASSWORD</span>':''}</div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No breaches found</div>';
+}
+
+function renderIP(ip) {
+  document.getElementById('ip-summary').textContent = `${ip.ips_found} IPs · ${ip.unique_countries} countries · ${ip.vpn_count} VPN · ${ip.tor_count} Tor`;
+  const flagMap = {India:'🇮🇳',Russia:'🇷🇺',USA:'🇺🇸',Netherlands:'🇳🇱',Germany:'🇩🇪',Singapore:'🇸🇬',Ukraine:'🇺🇦',Romania:'🇷🇴',China:'🇨🇳',Brazil:'🇧🇷'};
+  document.getElementById('ip-list').innerHTML = ip.ips.map(i=>`
+    <div class="ip-card">
+      <div class="ip-flag">${flagMap[i.country]||'🌍'}</div>
+      <div class="ip-info">
+        <div class="ip-addr">${i.ip}</div>
+        <div class="ip-location">${i.city}, ${i.country} · ${i.isp} · ${i.asn}</div>
+        <div class="ip-location mono text-dim" style="font-size:0.65rem">Abuse Reports: ${i.abuse_reports} · Last: ${i.last_seen} · Threat: ${i.threat_score}/100</div>
+        <div class="ip-tags">
+          ${i.is_tor?'<span class="ip-tag tag-tor">TOR EXIT</span>':''}
+          ${i.is_vpn?'<span class="ip-tag tag-vpn">VPN</span>':''}
+          ${i.is_proxy?'<span class="ip-tag tag-vpn">PROXY</span>':''}
+          ${i.is_cloud?'<span class="ip-tag tag-cloud">CLOUD HOST</span>':''}
+          ${!i.is_tor&&!i.is_vpn&&!i.is_proxy?'<span class="ip-tag tag-normal">RESIDENTIAL</span>':''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCrypto(crypto) {
+  document.getElementById('crypto-total').textContent = `$${crypto.total_usd.toLocaleString()} est. total`;
+  document.getElementById('crypto-list').innerHTML = crypto.wallets.map(w=>`
+    <div class="wallet-card">
+      <div class="wallet-chain">${w.chain} (${w.symbol})</div>
+      <div class="wallet-addr">${w.address}</div>
+      <div style="display:flex;gap:1rem;align-items:baseline">
+        <div class="wallet-balance">${w.balance} ${w.symbol}</div>
+        <div class="wallet-usd">≈ $${w.balance_usd.toLocaleString()}</div>
+      </div>
+      <div class="mono text-dim" style="font-size:0.65rem;margin-top:0.3rem">${w.transactions} txns · ${w.first_seen} → ${w.last_active} · Risk: ${w.risk_score}/100</div>
+      ${w.risk_flags.length?`<div class="wallet-risk-flags">${w.risk_flags.map(f=>`<span class="risk-flag">⚠ ${f.replace(/_/g,' ')}</span>`).join('')}</div>`:''}
+      <div class="mono text-dim" style="font-size:0.62rem;margin-top:0.3rem">Exchanges: ${w.connected_exchanges.join(', ')}</div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No wallets found</div>';
+}
+
+function renderDarkWeb(dw) {
+  const badge = document.getElementById('dark-web-badge');
+  badge.textContent = dw.dark_web_threat;
+  badge.className = `severity-badge sev-${dw.dark_web_threat}`;
+  document.getElementById('dark-list').innerHTML = dw.mentions.map(m=>`
+    <div class="dark-mention">
+      <div class="dark-source">[ ${m.source} ] ${m.status==='SEIZED'?'⚰ SEIZED':''}</div>
+      <div class="dark-type">${m.mention_type.replace(/_/g,' ').toUpperCase()} <span class="severity-badge sev-${m.threat_level}">${m.threat_level}</span></div>
+      <div class="dark-context">"${m.context}"</div>
+      <div class="mono text-dim" style="font-size:0.62rem;margin-top:0.3rem">${m.date} · Conf: ${Math.round(m.confidence*100)}%</div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No dark web mentions detected</div>';
+}
+
+function renderDomains(domains) {
+  document.getElementById('domain-count').textContent = `${domains.domains_found} registered`;
+  document.getElementById('domain-list').innerHTML = domains.domains.map(d=>`
+    <div class="breach-item">
+      <div class="breach-header">
+        <span class="breach-name text-cyan">${d.domain}</span>
+        <span class="severity-badge ${d.ssl_valid?'sev-LOW':'sev-MEDIUM'}">${d.ssl_valid?'SSL ✓':'NO SSL'}</span>
+      </div>
+      <div class="breach-date mono text-dim" style="font-size:0.68rem;margin-bottom:0.4rem">
+        Registrar: ${d.registrar} · Created: ${d.created} · ${d.privacy_protected?'Privacy On':'WHOIS Exposed'}
+      </div>
+      <div class="breach-fields">${d.technologies.map(t=>`<span class="field-tag">${t}</span>`).join('')}</div>
+      <div class="mono text-dim" style="font-size:0.62rem;margin-top:0.4rem">Subdomains: ${d.subdomains.join(', ')}</div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No domains registered</div>';
+}
+
+function renderEmail(email) {
+  const el = document.getElementById('tab-email');
+  const statusColor = s => s ? 'var(--accent-green)' : 'var(--accent-red)';
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem">
+      ${[['Email', email.email], ['Domain', email.domain], ['Age', email.age_days+' days'], ['Reputation', email.reputation+'/100']].map(([l,v])=>`
+        <div class="component-item"><div class="comp-label">${l}</div><div class="mono text-cyan" style="font-size:0.8rem">${v}</div></div>`).join('')}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.75rem">
+      <span class="field-tag" style="border-color:${statusColor(email.spf)}">SPF ${email.spf?'✓':'✗'}</span>
+      <span class="field-tag" style="border-color:${statusColor(email.dkim)}">DKIM ${email.dkim?'✓':'✗'}</span>
+      <span class="field-tag" style="border-color:${statusColor(email.dmarc)}">DMARC ${email.dmarc?'✓':'✗'}</span>
+      ${email.disposable?'<span class="risk-flag">⚠ DISPOSABLE</span>':''}
+      ${email.google_account?'<span class="field-tag">Google Account</span>':''}
+      ${email.gravatar?'<span class="field-tag">Gravatar</span>':''}
+    </div>
+    <div class="comp-label">ASSOCIATED EMAILS</div>
+    ${email.associated_emails.map(e=>`<div class="mono text-secondary" style="font-size:0.72rem;padding:0.2rem 0">${e}</div>`).join('')}`;
+}
+
+function renderPhone(phone) {
+  document.getElementById('tab-phone').innerHTML = `
+    <div style="margin-bottom:0.75rem">
+      <div class="mono text-cyan" style="font-size:1rem">${phone.phone}</div>
+      <div class="mono text-secondary" style="font-size:0.72rem">${phone.carrier} · ${phone.line_type} · Spam Score: ${phone.spam_score}/100</div>
+      ${phone.truecaller_name?`<div class="mono" style="font-size:0.75rem;color:var(--accent-yellow);margin-top:0.3rem">Truecaller: ${phone.truecaller_name}</div>`:''}
+    </div>
+    <div class="comp-label" style="margin-bottom:0.5rem">LINKED APPS</div>
+    ${phone.apps_linked.map(a=>`
+      <div class="platform-item">
+        <div class="platform-dot dot-active"></div>
+        <div class="platform-name">${a.app}</div>
+        <div class="platform-user text-dim mono">${a.profile_name} · ${a.status}</div>
+      </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No app associations found</div>'}`;
+}
+
+function renderPastes(pastes) {
+  document.getElementById('tab-paste').innerHTML = pastes.pastes.map(p=>`
+    <div class="breach-item">
+      <div class="breach-header">
+        <span class="breach-name">${p.site}</span>
+        <span class="severity-badge ${p.contains_pii?'sev-HIGH':'sev-LOW'}">${p.contains_pii?'PII':'CLEAN'}</span>
+      </div>
+      <div class="breach-date mono text-dim" style="font-size:0.68rem">${p.date} · ${p.lines.toLocaleString()} lines · ${p.title.replace(/_/g,' ')}</div>
+      <div class="conf-bar" style="margin-top:0.4rem"><div class="conf-fill" style="width:${Math.round(p.confidence*100)}%"></div></div>
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No paste site mentions found</div>';
+}
+
+function renderImages(images) {
+  document.getElementById('tab-images').innerHTML = `
+    <div class="mono text-secondary" style="font-size:0.75rem;margin-bottom:0.75rem">${images.images_found} images found across platforms</div>
+    ${images.images.map(img=>`
+      <div class="breach-item" style="display:flex;gap:0.75rem;align-items:center">
+        <div style="font-size:1.5rem">🖼</div>
+        <div style="flex:1">
+          <div class="mono" style="font-size:0.78rem;color:var(--text-primary)">${img.source}</div>
+          <div class="mono text-dim" style="font-size:0.65rem">${img.face_detected?'👤 Face detected · ':''}${img.gps_embedded?'📍 GPS data · ':''}${img.camera||'Unknown camera'} · ${img.reverse_search_hits} reverse hits</div>
+        </div>
+      </div>`).join('')}`;
+}
+
+function renderRecords(records) {
+  document.getElementById('tab-records').innerHTML = records.records.map(r=>`
+    <div class="breach-item">
+      <div class="breach-header">
+        <span class="breach-name">${r.source}</span>
+        <span class="severity-badge ${r.match?'sev-HIGH':'sev-LOW'}">${r.match?'MATCH':'NO MATCH'}</span>
+      </div>
+      <div class="breach-date mono text-dim" style="font-size:0.68rem">${r.jurisdiction} · ${r.date} · Conf: ${Math.round(r.confidence*100)}%</div>
+    </div>`).join('');
+}
+
+function renderCreds(creds) {
+  document.getElementById('tab-creds').innerHTML = creds.credentials.map(c=>`
+    <div class="breach-item">
+      <div class="breach-header">
+        <span class="breach-name">${c.source}</span>
+        ${c.plaintext_risk?'<span class="risk-flag">⚠ PLAINTEXT RISK</span>':''}
+      </div>
+      <div class="breach-date mono text-dim" style="font-size:0.68rem">${c.email} · ${c.date_found}</div>
+      ${c.password_hash?`<div class="mono text-dim" style="font-size:0.62rem;margin-top:0.3rem">Hash: ${c.password_hash.substring(0,24)}...</div>`:''}
+    </div>`).join('') || '<div class="text-dim mono" style="font-size:0.75rem">No credentials found in public feeds</div>';
+}
+
+function renderBehavior(b) {
+  // Draw radar chart
+  const canvas = document.getElementById('radar-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 200, H = 200, cx = W/2, cy = H/2, r = 75;
+  ctx.clearRect(0,0,W,H);
+
+  const traits = Object.entries(b.traits);
+  const N = traits.length;
+  const angles = traits.map((_,i)=>-Math.PI/2 + (2*Math.PI*i/N));
+
+  // Grid
+  for (let ring=1;ring<=4;ring++) {
+    ctx.beginPath();
+    for (let i=0;i<N;i++) {
+      const a=angles[i], rv=r*ring/4;
+      i===0?ctx.moveTo(cx+rv*Math.cos(a),cy+rv*Math.sin(a)):ctx.lineTo(cx+rv*Math.cos(a),cy+rv*Math.sin(a));
+    }
+    ctx.closePath();
+    ctx.strokeStyle='rgba(30,58,95,0.8)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  // Spokes
+  for (let i=0;i<N;i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+r*Math.cos(angles[i]),cy+r*Math.sin(angles[i]));
+    ctx.strokeStyle='rgba(30,58,95,0.6)';
+    ctx.stroke();
+  }
+
+  // Data
+  ctx.beginPath();
+  for (let i=0;i<N;i++) {
+    const val=traits[i][1]/100, a=angles[i];
+    i===0?ctx.moveTo(cx+r*val*Math.cos(a),cy+r*val*Math.sin(a)):ctx.lineTo(cx+r*val*Math.cos(a),cy+r*val*Math.sin(a));
+  }
+  ctx.closePath();
+  ctx.fillStyle='rgba(0,212,255,0.15)';
+  ctx.fill();
+  ctx.strokeStyle='var(--accent-cyan)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  // Points
+  for (let i=0;i<N;i++) {
+    const val=traits[i][1]/100, a=angles[i];
+    ctx.beginPath();
+    ctx.arc(cx+r*val*Math.cos(a),cy+r*val*Math.sin(a),4,0,Math.PI*2);
+    ctx.fillStyle='var(--accent-cyan)';
+    ctx.fill();
+  }
+
+  // Labels (outside)
+  ctx.fillStyle='rgba(139,149,158,0.9)';
+  ctx.font='8px Share Tech Mono, monospace';
+  ctx.textAlign='center';
+  for (let i=0;i<N;i++) {
+    const a=angles[i], lx=cx+(r+18)*Math.cos(a), ly=cy+(r+18)*Math.sin(a);
+    ctx.fillText(traits[i][0].replace(/_/g,' ').toUpperCase().substring(0,8),lx,ly+3);
+  }
+
+  document.getElementById('behavior-info').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.75rem">
+      <div><div class="comp-label">TIMEZONE</div><div class="mono text-cyan">${b.timezone}</div></div>
+      <div><div class="comp-label">PEAK HOUR</div><div class="mono text-cyan">${b.peak_hour}:00 UTC</div></div>
+      <div><div class="comp-label">ACTIVITY</div><div class="mono text-yellow">${b.activity}</div></div>
+      <div><div class="comp-label">PERSONAS</div><div class="mono text-red">${b.persona_count}</div></div>
+    </div>
+    <div style="margin-top:0.75rem">
+      <div class="comp-label">THREAT ACTOR TYPE</div>
+      <div class="mono" style="font-size:0.8rem;color:var(--accent-red);margin-bottom:0.5rem">${b.threat_actor}</div>
+      <div class="comp-label">DEVICES</div>
+      <div class="breach-fields" style="margin-top:0.3rem">${b.devices.map(d=>`<span class="field-tag">${d}</span>`).join('')}</div>
+      <div class="comp-label" style="margin-top:0.5rem">LANGUAGES</div>
+      <div class="breach-fields" style="margin-top:0.3rem">${b.languages.map(l=>`<span class="field-tag">${l}</span>`).join('')}</div>
+    </div>`;
+}
+
+function renderNetworkGraph(network) {
+  const canvas = document.getElementById('network-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const cx = W/2, cy = H/2;
+  const nodeMap = {};
+  for (const n of network.nodes) {
+    nodeMap[n.id] = { ...n, sx: cx + n.x * 1.1, sy: cy + n.y * 1.1 };
+  }
+
+  // Background
+  ctx.fillStyle = 'var(--bg-card)';
+  ctx.fillRect(0,0,W,H);
+
+  // Edges
+  for (const e of network.edges) {
+    const from = nodeMap[e.from], to = nodeMap[e.to];
+    if (!from || !to) continue;
+    ctx.beginPath();
+    ctx.moveTo(from.sx, from.sy);
+    ctx.lineTo(to.sx, to.sy);
+    ctx.strokeStyle = `rgba(0,212,255,${e.weight*0.35})`;
+    ctx.lineWidth = e.weight;
+    ctx.stroke();
+  }
+
+  // Nodes
+  for (const n of Object.values(nodeMap)) {
+    const s = n.size;
+    ctx.beginPath();
+    ctx.arc(n.sx, n.sy, s/2, 0, Math.PI*2);
+    ctx.fillStyle = n.color + '33';
+    ctx.fill();
+    ctx.strokeStyle = n.color;
+    ctx.lineWidth = n.id==='target'?2.5:1.5;
+    ctx.stroke();
+
+    if (n.id === 'target') {
+      ctx.beginPath(); ctx.arc(n.sx,n.sy,s/2+5,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,68,68,0.3)'; ctx.lineWidth=1; ctx.stroke();
+    }
+
+    ctx.fillStyle = n.id==='target'?'#fff':'rgba(230,237,243,0.85)';
+    ctx.font = `${n.id==='target'?8:7}px Share Tech Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(n.label.substring(0,14), n.sx, n.sy+s/2+11);
+  }
+
+  document.getElementById('graph-stats').textContent = `${network.nodes.length} entities · ${network.edges.length} connections`;
+
+  const legendData = [['target','Target','#ff4444'],['social','Social','#4488ff'],['breach','Breach','#ff6600'],['crypto','Crypto','#f7931a'],['ip','IP/Geo','#aa66ff']];
+  document.getElementById('legend').innerHTML = legendData.map(([,label,color])=>`
+    <span style="display:flex;align-items:center;gap:0.3rem;font-family:Share Tech Mono,monospace;font-size:0.62rem;color:var(--text-dim)">
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></span>${label}
+    </span>`).join('');
+}
+
+function renderIOC(threat) {
+  const iocs = threat.iocs;
+  const total = Object.values(iocs).reduce((a,b)=>a+b,0);
+  document.getElementById('ioc-section').innerHTML = `
+    <div style="margin-bottom:1rem;display:flex;gap:1.5rem">
+      <div><div class="stat-number text-cyan">${total}</div><div class="stat-label">Total IOCs</div></div>
+    </div>
+    <table class="ioc-table">
+      <thead><tr><th>TYPE</th><th>COUNT</th><th>EXPORT FORMAT</th></tr></thead>
+      <tbody>${Object.entries(iocs).map(([k,v])=>`
+        <tr><td class="ioc-type">${k.replace(/_/g,' ').toUpperCase()}</td><td class="text-cyan mono">${v}</td><td class="text-dim mono" style="font-size:0.65rem">STIX 2.1 / MISP</td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderMitre(threat) {
+  document.getElementById('mitre-section').innerHTML = `
+    <div class="comp-label" style="margin-bottom:0.5rem">MAPPED ATT&CK TACTICS</div>
+    <div class="mitre-grid" style="margin-bottom:1.25rem">${threat.mitre.map(t=>`<span class="mitre-tactic">${t}</span>`).join('')}</div>
+    <div class="comp-label" style="margin-bottom:0.5rem">RECOMMENDED ACTIONS</div>
+    ${['Flag for law enforcement referral','Submit IOCs to threat intel feeds','Cross-reference with APT group TTPs','Initiate account suspension requests','Preserve evidence chain for forensic analysis'].map(a=>`<div class="timeline-item" style="padding:0.4rem 0"><div style="color:var(--accent-green);margin-right:0.5rem">▶</div><div style="font-size:0.82rem">${a}</div></div>`).join('')}`;
+}
+
+function renderTimeline(p) {
+  const events = [];
+  for (const b of p.breaches.breaches.slice(0,6)) events.push({ date:b.date, event:`Data exposed in ${b.breach}`, source:'Breach Intelligence', icon:'🔓', color:'var(--high)' });
+  for (const m of p.darkweb.mentions.slice(0,4)) events.push({ date:m.date, event:`Dark web mention: ${m.mention_type.replace(/_/g,' ')}`, source:m.source, icon:'🕵️', color:'var(--critical)' });
+  for (const s of p.social.profiles.slice(0,5)) events.push({ date:s.last_active, event:`Active on ${s.platform} as @${s.username}`, source:'Social Media', icon:'🌐', color:'#4488ff' });
+  for (const w of p.crypto.wallets.slice(0,3)) events.push({ date:w.first_seen, event:`${w.chain} wallet created`, source:'Blockchain', icon:'₿', color:'var(--accent-yellow)' });
+
+  events.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  document.getElementById('timeline-section').innerHTML = `<div style="position:relative;padding-left:1.5rem">${events.map(e=>`
+    <div class="timeline-item">
+      <div class="timeline-line"></div>
+      <div class="timeline-dot" style="border-color:${e.color}">${e.icon}</div>
+      <div class="timeline-content">
+        <div class="timeline-date">${e.date}</div>
+        <div class="timeline-event">${e.event}</div>
+        <div class="timeline-source">Source: ${e.source}</div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// EXPORT FUNCTIONS
+// ────────────────────────────────────────────────────────────────────────────
+
+function exportJSON() {
+  if (!currentProfile) return;
+  const blob = new Blob([JSON.stringify(currentProfile, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ghosttrace_${currentProfile.query}_${Date.now()}.json`;
+  a.click();
+  showToast('⬇ JSON exported');
+}
+
+function exportReport() {
+  if (!currentProfile) return;
+  const p = currentProfile;
+  const html = `<!DOCTYPE html><html><head><title>Ghost Trace Report — ${p.query}</title>
+  <style>body{font-family:monospace;background:#010409;color:#e6edf3;padding:2rem;max-width:900px;margin:0 auto}
+  h1{color:#00d4ff;font-size:1.5rem}h2{color:#00ff88;font-size:1rem;border-bottom:1px solid #1e3a5f;padding-bottom:0.3rem;margin-top:1.5rem}
+  .row{display:flex;gap:1rem;margin:0.5rem 0}.label{color:#484f58;width:180px;flex-shrink:0}.val{color:#e6edf3}
+  .badge{display:inline-block;padding:0.1rem 0.5rem;border-radius:3px;font-size:0.8rem}
+  .critical{background:rgba(255,23,68,0.2);color:#ff1744}.high{background:rgba(255,102,0,0.2);color:#ff6600}
+  .medium{background:rgba(255,214,0,0.2);color:#ffd600}.low{background:rgba(0,230,118,0.2);color:#00e676}
+  </style></head><body>
+  <h1>👁 GHOST TRACE — OSINT Intelligence Report</h1>
+  <div class="row"><span class="label">TARGET</span><span class="val">${p.query}</span></div>
+  <div class="row"><span class="label">INPUT TYPE</span><span class="val">${p.input.type.toUpperCase()}</span></div>
+  <div class="row"><span class="label">GENERATED</span><span class="val">${new Date().toUTCString()}</span></div>
+  <div class="row"><span class="label">THREAT SCORE</span><span class="val badge ${p.threat.level.toLowerCase()}">${p.threat.score}/100 — ${p.threat.level}</span></div>
+  <h2>SOCIAL MEDIA</h2>
+  ${p.social.profiles.map(s=>`<div class="row"><span class="label">${s.platform}</span><span class="val">@${s.username} · ${s.status} · ${Math.round(s.confidence*100)}%</span></div>`).join('')}
+  <h2>DATA BREACHES (${p.breaches.found} found)</h2>
+  ${p.breaches.breaches.map(b=>`<div class="row"><span class="label">${b.breach}</span><span class="val badge ${b.severity.toLowerCase()}">${b.severity}</span><span class="val" style="margin-left:0.5rem">${b.exposed_fields.join(', ')}</span></div>`).join('')}
+  <h2>DARK WEB (${p.darkweb.mentions_found} mentions)</h2>
+  ${p.darkweb.mentions.map(m=>`<div class="row"><span class="label">${m.source}</span><span class="val">${m.mention_type.replace(/_/g,' ')} — ${m.date}</span></div>`).join('')}
+  <h2>CRYPTOCURRENCY</h2>
+  ${p.crypto.wallets.map(w=>`<div class="row"><span class="label">${w.chain}</span><span class="val">${w.address} · ${w.balance} ${w.symbol} ≈ $${w.balance_usd}</span></div>`).join('')}
+  <h2>IP ADDRESSES</h2>
+  ${p.ip.ips.map(i=>`<div class="row"><span class="label">${i.ip}</span><span class="val">${i.city}, ${i.country} · ${i.is_tor?'[TOR] ':''}${i.is_vpn?'[VPN] ':''}${i.isp}</span></div>`).join('')}
+  <h2>MITRE ATT&CK</h2>
+  <div class="row"><span class="label">TACTICS</span><span class="val">${p.threat.mitre.join(' → ')}</span></div>
+  </body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ghosttrace_report_${p.query}_${Date.now()}.html`;
+  a.click();
+  showToast('📄 HTML report exported');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// CLOCK
+// ────────────────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toUTCString().split(' ')[4]+' UTC';
+}
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>
